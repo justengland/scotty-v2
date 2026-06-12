@@ -84,7 +84,7 @@ context = ["architecture.md"]
 
 [repos.beta]
 agent = "claude-code"
-`,
+`
   );
   await writeFile(
     join(vaultPath, "orders", "local.toml"),
@@ -96,7 +96,7 @@ path = "${repoLocalPath}"
 
 [repos.beta]
 path = "/tmp/beta"
-`,
+`
   );
 }
 
@@ -122,7 +122,8 @@ exit 0
 
 function installMockDiscordWebhook(): { payloads: string[] } {
   const payloads: string[] = [];
-  process.env.DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/test/token";
+  process.env.DISCORD_WEBHOOK_URL =
+    "https://discord.com/api/webhooks/test/token";
   globalThis.fetch = (async (_url, init) => {
     payloads.push(String(init?.body));
     return new Response("", { status: 204 });
@@ -141,7 +142,7 @@ async function setupDispatchFixtures(): Promise<void> {
 test("passes", () => {
   expect(1).toBe(1);
 });
-`,
+`
   );
   await Bun.$`git init`.cwd(vaultPath).quiet();
   await Bun.$`git config user.email test@example.com`.cwd(vaultPath).quiet();
@@ -157,7 +158,9 @@ test("bridge init scaffolds an empty vault directory", async () => {
 
   const output = stdout.join("\n");
   expect(output).toContain("Scaffolded Scotty Vault");
-  expect(await Bun.file(join(vaultPath, "Scotty Index.md")).exists()).toBe(true);
+  expect(await Bun.file(join(vaultPath, "Scotty Index.md")).exists()).toBe(
+    true
+  );
 });
 
 test("bridge roster prints Duty Roster entries", async () => {
@@ -200,7 +203,9 @@ test("bridge dispatch runs Claude Team with context and logs outcome", async () 
   });
 
   const logDir = join(vaultPath, "log");
-  const logFiles = (await readdir(logDir)).filter((name) => name.endsWith(".md"));
+  const logFiles = (await readdir(logDir)).filter((name) =>
+    name.endsWith(".md")
+  );
   expect(logFiles.length).toBeGreaterThan(0);
 
   const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
@@ -259,7 +264,7 @@ test("bridge dispatch loads Task from --file", async () => {
     `# Ship the feature
 
 Implement the feature end to end.
-`,
+`
   );
 
   await runCommand(bridgeCommand, {
@@ -267,7 +272,9 @@ Implement the feature end to end.
   });
 
   const logDir = join(vaultPath, "log");
-  const logFiles = (await readdir(logDir)).filter((name) => name.endsWith(".md"));
+  const logFiles = (await readdir(logDir)).filter((name) =>
+    name.endsWith(".md")
+  );
   const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
   expect(logContent).toContain("Ship the feature");
 });
@@ -289,7 +296,9 @@ test("bridge dispatch sets Task priority from --priority", async () => {
   });
 
   const logDir = join(vaultPath, "log");
-  const logFiles = (await readdir(logDir)).filter((name) => name.endsWith(".md"));
+  const logFiles = (await readdir(logDir)).filter((name) =>
+    name.endsWith(".md")
+  );
   const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
   expect(logContent).toContain("**Priority:** 7");
 });
@@ -345,7 +354,7 @@ test("bridge dispatch fails when Tricorder fails and logs verification", async (
 test("fails", () => {
   expect(1).toBe(2);
 });
-`,
+`
   );
   const markerPath = join(repoPath, "marker.txt");
   await writeFile(markerPath, "inspect-me");
@@ -364,7 +373,9 @@ test("fails", () => {
   expect(process.exitCode).toBe(1);
 
   const logDir = join(vaultPath, "log");
-  const logFiles = (await readdir(logDir)).filter((name) => name.endsWith(".md"));
+  const logFiles = (await readdir(logDir)).filter((name) =>
+    name.endsWith(".md")
+  );
   const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
   expect(logContent).toContain("**Tricorder:** failed");
   expect(await Bun.file(markerPath).text()).toBe("inspect-me");
@@ -381,7 +392,7 @@ test("bridge dispatch succeeds when Tricorder passes despite Away Team failure",
     `#!/bin/sh
 echo "mock-claude: failed run" >&2
 exit 1
-`,
+`
   );
   await chmod(join(mockBinDir, "claude"), 0o755);
 
@@ -399,7 +410,9 @@ exit 1
   expect(process.exitCode).toBe(0);
 
   const logDir = join(vaultPath, "log");
-  const logFiles = (await readdir(logDir)).filter((name) => name.endsWith(".md"));
+  const logFiles = (await readdir(logDir)).filter((name) =>
+    name.endsWith(".md")
+  );
   const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
   expect(logContent).toContain("**Tricorder:** passed");
   expect(logContent).toContain("**Outcome:** success");
@@ -414,7 +427,7 @@ test("bridge dispatch --skip-verify bypasses Tricorder", async () => {
 test("fails", () => {
   expect(1).toBe(2);
 });
-`,
+`
   );
 
   await runCommand(bridgeCommand, {
@@ -432,7 +445,9 @@ test("fails", () => {
   expect(process.exitCode).toBe(0);
 
   const logDir = join(vaultPath, "log");
-  const logFiles = (await readdir(logDir)).filter((name) => name.endsWith(".md"));
+  const logFiles = (await readdir(logDir)).filter((name) =>
+    name.endsWith(".md")
+  );
   const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
   expect(logContent).not.toContain("**Tricorder:**");
 });
@@ -458,7 +473,7 @@ remote = "git@github.com:example/scotty-vault.git"
 [repos.alpha]
 agent = "claude-code"
 verify = "markdown"
-`,
+`
   );
 
   await runCommand(bridgeCommand, {
@@ -475,7 +490,9 @@ verify = "markdown"
   expect(process.exitCode).toBe(0);
 
   const logDir = join(vaultPath, "log");
-  const logFiles = (await readdir(logDir)).filter((name) => name.endsWith(".md"));
+  const logFiles = (await readdir(logDir)).filter((name) =>
+    name.endsWith(".md")
+  );
   const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
   expect(logContent).toContain("markdown verification passed");
 });
@@ -494,7 +511,7 @@ path = "${repoPath}"
 
 [repos.beta]
 path = "${betaPath}"
-`,
+`
   );
   await writeFile(
     join(vaultPath, "orders", "mission-orders.toml"),
@@ -503,11 +520,14 @@ remote = "git@github.com:example/scotty-vault.git"
 
 [repos.beta]
 agent = "claude-code"
-`,
+`
   );
   await mkdir(join(vaultPath, "archive", "beta"), { recursive: true });
   await writeFile(join(vaultPath, "archive", "beta", "index.md"), "# Beta\n");
-  await writeFile(join(vaultPath, "archive", "beta", "captains-log.md"), "# Log\n");
+  await writeFile(
+    join(vaultPath, "archive", "beta", "captains-log.md"),
+    "# Log\n"
+  );
 
   await runCommand(bridgeCommand, {
     rawArgs: [
@@ -523,7 +543,9 @@ agent = "claude-code"
   expect(process.exitCode).toBe(0);
 
   const logDir = join(vaultPath, "log");
-  const logFiles = (await readdir(logDir)).filter((name) => name.endsWith(".md"));
+  const logFiles = (await readdir(logDir)).filter((name) =>
+    name.endsWith(".md")
+  );
   const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
   expect(logContent).not.toContain("**Tricorder:**");
 });
@@ -558,7 +580,10 @@ test("bridge dispatch hails on Away Team crash when repo has no verifier", async
   await writeOrders();
   await mkdir(join(vaultPath, "archive", "beta"), { recursive: true });
   await writeFile(join(vaultPath, "archive", "beta", "index.md"), "# Beta\n");
-  await writeFile(join(vaultPath, "archive", "beta", "captains-log.md"), "# Log\n");
+  await writeFile(
+    join(vaultPath, "archive", "beta", "captains-log.md"),
+    "# Log\n"
+  );
   await writeFile(
     join(vaultPath, "orders", "local.toml"),
     `[vault]
@@ -569,7 +594,7 @@ path = "${repoPath}"
 
 [repos.beta]
 path = "${betaPath}"
-`,
+`
   );
   await writeFile(
     join(vaultPath, "orders", "mission-orders.toml"),
@@ -578,7 +603,7 @@ remote = "git@github.com:example/scotty-vault.git"
 
 [repos.beta]
 agent = "claude-code"
-`,
+`
   );
   await Bun.$`git init`.cwd(vaultPath).quiet();
   await Bun.$`git config user.email test@example.com`.cwd(vaultPath).quiet();
@@ -589,7 +614,7 @@ agent = "claude-code"
     `#!/bin/sh
 echo "mock-claude: crashed" >&2
 exit 1
-`,
+`
   );
   await chmod(join(mockBinDir, "claude"), 0o755);
   process.env.SCOTTY_CLAUDE_PATH = join(mockBinDir, "claude");
@@ -663,11 +688,11 @@ sources: ["alpha@${sha}"]
 `;
   await writeFile(
     join(archiveDir, "index.md"),
-    `${frontmatter(initialSha)}# Alpha index\n`,
+    `${frontmatter(initialSha)}# Alpha index\n`
   );
   await writeFile(
     join(archiveDir, "captains-log.md"),
-    `${frontmatter(initialSha)}# Captain's Log\n`,
+    `${frontmatter(initialSha)}# Captain's Log\n`
   );
 
   await Bun.$`git init -b main`.cwd(vaultPath).quiet();
@@ -722,12 +747,12 @@ test("bridge diagnostic updates archive, commits, and pushes vault", async () =>
   expect(process.exitCode).toBe(0);
 
   const indexContent = await Bun.file(
-    join(vaultPath, "archive", "alpha", "index.md"),
+    join(vaultPath, "archive", "alpha", "index.md")
   ).text();
   expect(indexContent).toContain("Updated by diagnostic mock");
 
   const captainsLog = await Bun.file(
-    join(vaultPath, "archive", "alpha", "captains-log.md"),
+    join(vaultPath, "archive", "alpha", "captains-log.md")
   ).text();
   expect(captainsLog).toContain("mock-diagnostic: archive updated");
 
@@ -747,7 +772,7 @@ cat > archive/alpha/index.md <<EOF
 EOF
 echo "mock-diagnostic: invalid output"
 exit 0
-`,
+`
   );
   await chmod(join(mockBinDir, "claude"), 0o755);
 
@@ -768,4 +793,149 @@ test("bridge diagnostic errors when repo is missing from roster", async () => {
   const output = stdout.join("\n");
   expect(output).toContain('Repository "missing" is not on the Duty Roster');
   expect(process.exitCode).toBe(1);
+});
+
+async function writeEngineeringLogFixtures(): Promise<void> {
+  await writeOrders();
+  await mkdir(join(vaultPath, "archive"), { recursive: true });
+  await mkdir(join(vaultPath, "log"), { recursive: true });
+  await writeFile(
+    join(vaultPath, "log", "2026-06-10.md"),
+    `## dispatch: alpha — task-old
+
+- **Repo:** alpha
+- **Task:** Old alpha task
+- **Priority:** 1
+- **Outcome:** success
+- **Duration:** 500ms
+- **Summary:** Earlier dispatch.
+`
+  );
+  await writeFile(
+    join(vaultPath, "log", "2026-06-12.md"),
+    `## dispatch: alpha — task-recent
+
+- **Repo:** alpha
+- **Task:** Recent alpha task
+- **Priority:** 5
+- **Outcome:** success
+- **Duration:** 1200ms
+- **Summary:** Latest alpha run.
+- **Tricorder:** passed
+- **Verification:** bun test passed
+
+## dispatch: beta — task-beta
+
+- **Repo:** beta
+- **Task:** Beta task
+- **Priority:** 3
+- **Outcome:** failure
+- **Duration:** 800ms
+- **Summary:** Beta failed.
+- **Tricorder:** failed
+- **Verification:** bun test failed
+`
+  );
+  await Bun.$`git init`.cwd(vaultPath).quiet();
+  await Bun.$`git config user.email test@example.com`.cwd(vaultPath).quiet();
+  await Bun.$`git config user.name Test`.cwd(vaultPath).quiet();
+  await Bun.$`git add -A`.cwd(vaultPath).quiet();
+  await Bun.$`git commit -m ${"seed log fixtures"}`.cwd(vaultPath).quiet();
+}
+
+test("bridge log prints recent Engineering Log entries", async () => {
+  await writeEngineeringLogFixtures();
+
+  await runCommand(bridgeCommand, { rawArgs: ["log"] });
+
+  const output = stdout.join("\n");
+  expect(output).toContain("Recent alpha task");
+  expect(output).toContain("Beta task");
+  expect(output).toContain("Tricorder: passed");
+  expect(output).toContain("Tricorder: failed");
+  expect(output.indexOf("Recent alpha task")).toBeLessThan(
+    output.indexOf("Old alpha task")
+  );
+});
+
+test("bridge log --repo filters to a single repository", async () => {
+  await writeEngineeringLogFixtures();
+
+  await runCommand(bridgeCommand, { rawArgs: ["log", "--repo", "beta"] });
+
+  const output = stdout.join("\n");
+  expect(output).toContain("Beta task");
+  expect(output).not.toContain("Recent alpha task");
+  expect(output).not.toContain("Old alpha task");
+});
+
+test("bridge log --since and --limit constrain output", async () => {
+  await writeEngineeringLogFixtures();
+
+  await runCommand(bridgeCommand, {
+    rawArgs: [
+      "log",
+      "--repo",
+      "alpha",
+      "--since",
+      "2026-06-11",
+      "--limit",
+      "1",
+    ],
+  });
+
+  const output = stdout.join("\n");
+  expect(output).toContain("Recent alpha task");
+  expect(output).not.toContain("Old alpha task");
+  expect(output).not.toContain("Beta task");
+});
+
+test("bridge log prints clear message when log directory is empty", async () => {
+  await writeOrders();
+  await mkdir(join(vaultPath, "log"), { recursive: true });
+  await Bun.$`git init`.cwd(vaultPath).quiet();
+
+  await runCommand(bridgeCommand, { rawArgs: ["log"] });
+
+  const output = stdout.join("\n");
+  expect(output).toContain("No Engineering Log entries found.");
+  expect(process.exitCode ?? 0).toBe(0);
+});
+
+test("bridge log pulls vault before reading entries", async () => {
+  await writeEngineeringLogFixtures();
+  await Bun.$`git branch -M main`.cwd(vaultPath).quiet();
+  const bareRemote = join(tempRoot, "vault-remote.git");
+  await Bun.$`git init --bare -b main ${bareRemote}`.quiet();
+  await Bun.$`git remote add origin ${bareRemote}`.cwd(vaultPath).quiet();
+  await Bun.$`git push -u origin main`.cwd(vaultPath).quiet();
+
+  const clonePath = join(tempRoot, "vault-clone");
+  await Bun.$`git clone ${bareRemote} ${clonePath}`.quiet();
+  process.env.SCOTTY_VAULT_PATH = clonePath;
+
+  const remoteVault = join(tempRoot, "remote-vault");
+  await Bun.$`git clone ${bareRemote} ${remoteVault}`.quiet();
+  await writeFile(
+    join(remoteVault, "log", "2026-06-13.md"),
+    `## dispatch: alpha — task-remote
+
+- **Repo:** alpha
+- **Task:** Remote-only entry
+- **Priority:** 9
+- **Outcome:** success
+- **Duration:** 100ms
+- **Summary:** Pulled from remote.
+`
+  );
+  await Bun.$`git config user.email test@example.com`.cwd(remoteVault).quiet();
+  await Bun.$`git config user.name Test`.cwd(remoteVault).quiet();
+  await Bun.$`git add -A`.cwd(remoteVault).quiet();
+  await Bun.$`git commit -m ${"add remote log"}`.cwd(remoteVault).quiet();
+  await Bun.$`git push origin main`.cwd(remoteVault).quiet();
+
+  await runCommand(bridgeCommand, { rawArgs: ["log", "--limit", "1"] });
+
+  const output = stdout.join("\n");
+  expect(output).toContain("Remote-only entry");
 });

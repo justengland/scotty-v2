@@ -3,6 +3,7 @@ import { diagnosticCommand } from "./commands/diagnostic";
 import { dispatchCommand } from "./commands/dispatch";
 import { hailCommand } from "./commands/hail";
 import { initCommand } from "./commands/init";
+import { logCommand } from "./commands/log";
 import { rosterCommand } from "./commands/roster";
 
 export const bridgeCommand = defineCommand({
@@ -15,6 +16,7 @@ export const bridgeCommand = defineCommand({
   subCommands: {
     init: initCommand,
     roster: rosterCommand,
+    log: logCommand,
     dispatch: dispatchCommand,
     diagnostic: diagnosticCommand,
     hail: hailCommand,

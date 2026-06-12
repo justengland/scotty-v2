@@ -4,12 +4,14 @@ import { diagnosticCommand } from "./cli/commands/diagnostic";
 import { dispatchCommand } from "./cli/commands/dispatch";
 import { hailCommand } from "./cli/commands/hail";
 import { initCommand } from "./cli/commands/init";
+import { logCommand } from "./cli/commands/log";
 import { rosterCommand } from "./cli/commands/roster";
 import { bridgeCommand } from "./cli/main";
 
 const PHASE1_COMMANDS = [
   "init",
   "roster",
+  "log",
   "dispatch",
   "diagnostic",
   "hail",
@@ -18,6 +20,7 @@ const PHASE1_COMMANDS = [
 const COMMAND_HELP_CASES = [
   { name: "init", command: initCommand, term: "Scotty Vault" },
   { name: "roster", command: rosterCommand, term: "Duty Roster" },
+  { name: "log", command: logCommand, term: "Engineering Log" },
   { name: "dispatch", command: dispatchCommand, term: "Away Team" },
   { name: "diagnostic", command: diagnosticCommand, term: "Diagnostic Cycle" },
   { name: "hail", command: hailCommand, term: "Hailing Frequencies" },
@@ -35,7 +38,7 @@ for (const { name, command, term } of COMMAND_HELP_CASES) {
   test(`bridge ${name} --help uses domain vocabulary`, async () => {
     const usage = await renderUsage(
       command as CommandDef<ArgsDef>,
-      bridgeCommand,
+      bridgeCommand
     );
     expect(usage).toContain(term);
   });
@@ -44,8 +47,10 @@ for (const { name, command, term } of COMMAND_HELP_CASES) {
 test("bridge hail completes when DISCORD_WEBHOOK_URL is configured", async () => {
   const originalWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
   const originalFetch = globalThis.fetch;
-  process.env.DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/test/token";
-  globalThis.fetch = (async () => new Response("", { status: 204 })) as unknown as typeof fetch;
+  process.env.DISCORD_WEBHOOK_URL =
+    "https://discord.com/api/webhooks/test/token";
+  globalThis.fetch = (async () =>
+    new Response("", { status: 204 })) as unknown as typeof fetch;
 
   try {
     await runCommand(bridgeCommand, { rawArgs: ["hail"] });

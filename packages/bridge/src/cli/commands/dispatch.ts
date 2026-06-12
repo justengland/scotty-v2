@@ -41,6 +41,10 @@ export const dispatchCommand = defineCommand({
       description: "Task priority (default 0)",
       alias: "p",
     },
+    "skip-verify": {
+      type: "boolean",
+      description: "Skip Tricorder verification",
+    },
   },
   async run({ args }) {
     try {
@@ -69,6 +73,7 @@ export const dispatchCommand = defineCommand({
         description: args.description,
         file: args.file,
         priority,
+        skipVerify: args["skip-verify"],
         awayTeam,
       });
 

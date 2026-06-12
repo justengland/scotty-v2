@@ -119,6 +119,15 @@ async function setupDispatchFixtures(): Promise<void> {
   await writeOrders();
   await writeArchiveContext();
   await mkdir(repoPath, { recursive: true });
+  await writeFile(
+    join(repoPath, "passing.test.ts"),
+    `import { expect, test } from "bun:test";
+
+test("passes", () => {
+  expect(1).toBe(1);
+});
+`,
+  );
   await Bun.$`git init`.cwd(vaultPath).quiet();
   await Bun.$`git config user.email test@example.com`.cwd(vaultPath).quiet();
   await Bun.$`git config user.name Test`.cwd(vaultPath).quiet();
@@ -182,7 +191,7 @@ test("bridge dispatch runs Claude Team with context and logs outcome", async () 
   const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
   expect(logContent).toContain("dispatch: alpha");
   expect(logContent).toContain("Fix the widget");
-  expect(logContent).toContain("mock-claude: executed");
+  expect(logContent).toContain("**Tricorder:** passed");
   expect(logContent).not.toContain("Repair the broken widget.");
 
   const vaultLog = await Bun.$`git log --oneline`.cwd(vaultPath).quiet();
@@ -271,4 +280,192 @@ test("bridge dispatch errors when claude is not on PATH", async () => {
   const output = stdout.join("\n");
   expect(output).toContain("claude is not on PATH");
   expect(output).not.toContain("mock-claude: executed");
+});
+
+test("bridge dispatch fails when Tricorder fails and logs verification", async () => {
+  await setupDispatchFixtures();
+  await writeFile(
+    join(repoPath, "passing.test.ts"),
+    `import { expect, test } from "bun:test";
+
+test("fails", () => {
+  expect(1).toBe(2);
+});
+`,
+  );
+  const markerPath = join(repoPath, "marker.txt");
+  await writeFile(markerPath, "inspect-me");
+
+  await runCommand(bridgeCommand, {
+    rawArgs: [
+      "dispatch",
+      "alpha",
+      "--title",
+      "Tricorder fail",
+      "--description",
+      "Tests should fail.",
+    ],
+  });
+
+  expect(process.exitCode).toBe(1);
+
+  const logDir = join(vaultPath, "log");
+  const logFiles = (await readdir(logDir)).filter((name) => name.endsWith(".md"));
+  const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
+  expect(logContent).toContain("**Tricorder:** failed");
+  expect(await Bun.file(markerPath).text()).toBe("inspect-me");
+});
+
+test("bridge dispatch succeeds when Tricorder passes despite Away Team failure", async () => {
+  await setupDispatchFixtures();
+  await writeFile(
+    join(mockBinDir, "claude"),
+    `#!/bin/sh
+echo "mock-claude: failed run" >&2
+exit 1
+`,
+  );
+  await chmod(join(mockBinDir, "claude"), 0o755);
+
+  await runCommand(bridgeCommand, {
+    rawArgs: [
+      "dispatch",
+      "alpha",
+      "--title",
+      "Away Team fail",
+      "--description",
+      "Tricorder should still pass.",
+    ],
+  });
+
+  expect(process.exitCode).toBe(0);
+
+  const logDir = join(vaultPath, "log");
+  const logFiles = (await readdir(logDir)).filter((name) => name.endsWith(".md"));
+  const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
+  expect(logContent).toContain("**Tricorder:** passed");
+  expect(logContent).toContain("**Outcome:** success");
+});
+
+test("bridge dispatch --skip-verify bypasses Tricorder", async () => {
+  await setupDispatchFixtures();
+  await writeFile(
+    join(repoPath, "passing.test.ts"),
+    `import { expect, test } from "bun:test";
+
+test("fails", () => {
+  expect(1).toBe(2);
+});
+`,
+  );
+
+  await runCommand(bridgeCommand, {
+    rawArgs: [
+      "dispatch",
+      "alpha",
+      "--title",
+      "Skip verify",
+      "--description",
+      "Ignore failing tests.",
+      "--skip-verify",
+    ],
+  });
+
+  expect(process.exitCode).toBe(0);
+
+  const logDir = join(vaultPath, "log");
+  const logFiles = (await readdir(logDir)).filter((name) => name.endsWith(".md"));
+  const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
+  expect(logContent).not.toContain("**Tricorder:**");
+});
+
+test("bridge dispatch runs markdown Tricorder for configured repo", async () => {
+  const markdownRepoPath = join(tempRoot, "docs-repo");
+  await mkdir(markdownRepoPath, { recursive: true });
+  await writeFile(join(markdownRepoPath, "README.md"), "# Docs\n");
+  await writeOrders(markdownRepoPath);
+  await mkdir(join(vaultPath, "archive", "alpha"), { recursive: true });
+  await writeArchiveContext();
+  await Bun.$`git init`.cwd(vaultPath).quiet();
+  await Bun.$`git config user.email test@example.com`.cwd(vaultPath).quiet();
+  await Bun.$`git config user.name Test`.cwd(vaultPath).quiet();
+  await installMockClaude();
+  process.env.SCOTTY_CLAUDE_PATH = join(mockBinDir, "claude");
+
+  await writeFile(
+    join(vaultPath, "orders", "mission-orders.toml"),
+    `[vault]
+remote = "git@github.com:example/scotty-vault.git"
+
+[repos.alpha]
+agent = "claude-code"
+verify = "markdown"
+`,
+  );
+
+  await runCommand(bridgeCommand, {
+    rawArgs: [
+      "dispatch",
+      "alpha",
+      "--title",
+      "Docs check",
+      "--description",
+      "Markdown verifier.",
+    ],
+  });
+
+  expect(process.exitCode).toBe(0);
+
+  const logDir = join(vaultPath, "log");
+  const logFiles = (await readdir(logDir)).filter((name) => name.endsWith(".md"));
+  const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
+  expect(logContent).toContain("markdown verification passed");
+});
+
+test("bridge dispatch without verify uses Away Team outcome only", async () => {
+  await setupDispatchFixtures();
+  const betaPath = join(tempRoot, "beta-repo");
+  await mkdir(betaPath, { recursive: true });
+  await writeFile(
+    join(vaultPath, "orders", "local.toml"),
+    `[vault]
+path = "${vaultPath}"
+
+[repos.alpha]
+path = "${repoPath}"
+
+[repos.beta]
+path = "${betaPath}"
+`,
+  );
+  await writeFile(
+    join(vaultPath, "orders", "mission-orders.toml"),
+    `[vault]
+remote = "git@github.com:example/scotty-vault.git"
+
+[repos.beta]
+agent = "claude-code"
+`,
+  );
+  await mkdir(join(vaultPath, "archive", "beta"), { recursive: true });
+  await writeFile(join(vaultPath, "archive", "beta", "index.md"), "# Beta\n");
+  await writeFile(join(vaultPath, "archive", "beta", "captains-log.md"), "# Log\n");
+
+  await runCommand(bridgeCommand, {
+    rawArgs: [
+      "dispatch",
+      "beta",
+      "--title",
+      "No verifier",
+      "--description",
+      "Beta has no verify key.",
+    ],
+  });
+
+  expect(process.exitCode).toBe(0);
+
+  const logDir = join(vaultPath, "log");
+  const logFiles = (await readdir(logDir)).filter((name) => name.endsWith(".md"));
+  const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
+  expect(logContent).not.toContain("**Tricorder:**");
 });

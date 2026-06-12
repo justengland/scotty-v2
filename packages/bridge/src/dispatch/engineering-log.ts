@@ -1,5 +1,6 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import type { VerificationResult } from "../tricorder/types";
 import type { ExecutionResult, Task } from "./types";
 
 export interface EngineeringLogEntry {
@@ -7,6 +8,7 @@ export interface EngineeringLogEntry {
   task: Task;
   result: ExecutionResult;
   summary: string;
+  verification?: VerificationResult;
 }
 
 function logFileName(date = new Date()): string {
@@ -15,7 +17,14 @@ function logFileName(date = new Date()): string {
 }
 
 export function formatEngineeringLogEntry(entry: EngineeringLogEntry): string {
-  const outcome = entry.result.success ? "success" : "failure";
+  const outcome = entry.verification
+    ? entry.verification.passed
+      ? "success"
+      : "failure"
+    : entry.result.success
+      ? "success"
+      : "failure";
+
   const lines = [
     `## dispatch: ${entry.repo} — ${entry.task.id}`,
     "",
@@ -25,8 +34,16 @@ export function formatEngineeringLogEntry(entry: EngineeringLogEntry): string {
     `- **Outcome:** ${outcome}`,
     `- **Duration:** ${entry.result.durationMs}ms`,
     `- **Summary:** ${entry.summary}`,
-    "",
   ];
+
+  if (entry.verification) {
+    lines.push(
+      `- **Tricorder:** ${entry.verification.passed ? "passed" : "failed"}`,
+      `- **Verification:** ${entry.verification.summary}`,
+    );
+  }
+
+  lines.push("");
   return lines.join("\n");
 }
 

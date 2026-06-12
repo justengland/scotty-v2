@@ -1,4 +1,6 @@
 import type { MissionOrders } from "../mission-orders/types";
+import { resolveVerifier } from "../tricorder/registry";
+import type { VerificationResult } from "../tricorder/types";
 import { VaultConfigError } from "../vault/resolve-vault-config";
 import { commitVaultLocally } from "../vault/commit-vault";
 import type { AwayTeam } from "./types";
@@ -14,6 +16,7 @@ export interface DispatchInput {
   description?: string;
   file?: string;
   priority?: number;
+  skipVerify?: boolean;
   awayTeam: AwayTeam;
 }
 
@@ -64,12 +67,26 @@ export async function runDispatch(input: DispatchInput): Promise<DispatchResult>
 
   const result = await input.awayTeam.execute(task, profile.path);
 
-  const summary = summarizeExecution(result.stdout, result.stderr, result.success);
+  let verification: VerificationResult | undefined;
+  if (profile.verify && !input.skipVerify) {
+    const verifier = resolveVerifier(profile.verify);
+    verification = await verifier.verify(profile.path);
+  }
+
+  const dispatchSucceeded = verification
+    ? verification.passed
+    : result.success;
+
+  const summary = verification
+    ? verification.summary
+    : summarizeExecution(result.stdout, result.stderr, result.success);
+
   const logPath = await appendEngineeringLogEntry(input.vaultPath, {
     repo: input.repoName,
     task,
     result,
     summary,
+    verification,
   });
 
   await commitVaultLocally(
@@ -78,7 +95,7 @@ export async function runDispatch(input: DispatchInput): Promise<DispatchResult>
   );
 
   return {
-    exitCode: result.success ? 0 : 1,
+    exitCode: dispatchSucceeded ? 0 : 1,
     taskId: task.id,
     logPath,
   };

@@ -1,10 +1,6 @@
-import type { MissionOrders } from "../mission-orders/types";
-import {
-  createHailChannels,
-  sendFailureHail,
-} from "../hailing/send-hail";
+import type { RepoProfile } from "../mission-orders/types";
+import { createHailChannels, sendFailureHail } from "../hailing/send-hail";
 import type { HailChannel } from "../hailing/types";
-import { VaultConfigError } from "../vault/resolve-vault-config";
 import { appendCaptainsLogEntry } from "./append-captains-log";
 import type { DiagnosticAgent } from "./claude-diagnostic";
 import { buildDiagnosticPromptForRepo } from "./claude-diagnostic";
@@ -16,8 +12,8 @@ import { validateArchivePages } from "./validate-archive";
 
 export interface RunDiagnosticInput {
   vaultPath: string;
-  orders: MissionOrders;
   repoName: string;
+  profile: RepoProfile;
   agent: DiagnosticAgent;
   hailChannels?: HailChannel[];
   commitAndPush?: (vaultPath: string, message: string) => Promise<void>;
@@ -29,7 +25,11 @@ export interface RunDiagnosticResult {
   summary: string;
 }
 
-function summarizeExecution(stdout: string, stderr: string, success: boolean): string {
+function summarizeExecution(
+  stdout: string,
+  stderr: string,
+  success: boolean
+): string {
   const combined = [stdout.trim(), stderr.trim()].filter(Boolean).join(" ");
   if (combined) {
     const firstLine = combined.split(/\r?\n/)[0] ?? combined;
@@ -39,18 +39,12 @@ function summarizeExecution(stdout: string, stderr: string, success: boolean): s
 }
 
 export async function runDiagnostic(
-  input: RunDiagnosticInput,
+  input: RunDiagnosticInput
 ): Promise<RunDiagnosticResult> {
-  const profile = input.orders.repos[input.repoName];
-  if (!profile) {
-    throw new VaultConfigError(
-      `Repository "${input.repoName}" is not on the Duty Roster. Check Mission Orders for available repos.`,
-    );
-  }
-
+  const profile = input.profile;
   if (!profile.path) {
     throw new DiagnosticError(
-      `Repository "${input.repoName}" has no local path in Mission Orders.`,
+      `Repository "${input.repoName}" has no local path in Mission Orders.`
     );
   }
 
@@ -106,7 +100,7 @@ export async function runDiagnostic(
     ((vaultPath, message) => commitAndPushVault(vaultPath, message));
   await commitAndPush(
     input.vaultPath,
-    `diagnostic: ${input.repoName} — ${repoHeadSha.slice(0, 7)}`,
+    `diagnostic: ${input.repoName} — ${repoHeadSha.slice(0, 7)}`
   );
 
   return { exitCode: 0, summary };
@@ -114,7 +108,7 @@ export async function runDiagnostic(
 
 async function hailDiagnosticFailure(
   input: RunDiagnosticInput,
-  summary: string,
+  summary: string
 ): Promise<void> {
   const configuredChannels =
     input.hailChannels !== undefined

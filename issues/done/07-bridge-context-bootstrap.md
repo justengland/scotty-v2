@@ -24,13 +24,13 @@ Injectable `VaultGitOps` for tests. Dedicated BridgeContext test suite. Update o
 
 ## Acceptance criteria
 
-- [ ] `prepareBridgeSession` resolves vault path, syncs vault, and returns merged Mission Orders
-- [ ] `resolveRosterRepo` throws on unknown repo (Duty Roster miss) and on missing local path
-- [ ] `bridge dispatch`, `diagnostic`, `roster`, `log`, and `status` each call `prepareBridgeSession` once — no duplicated bootstrap
-- [ ] `runDispatch` and `runDiagnostic` accept resolved profile; no internal Duty Roster lookup
-- [ ] Roster error messages remain substantially consistent with current behavior
-- [ ] BridgeContext tests use injectable `VaultGitOps` (no real `git pull` required)
-- [ ] All existing `packages/bridge` tests pass
+- [x] `prepareBridgeSession` resolves vault path, syncs vault, and returns merged Mission Orders
+- [x] `resolveRosterRepo` throws on unknown repo (Duty Roster miss) and on missing local path
+- [x] `bridge dispatch`, `diagnostic`, `roster`, `log`, and `status` each call `prepareBridgeSession` once — no duplicated bootstrap
+- [x] `runDispatch` and `runDiagnostic` accept resolved profile; no internal Duty Roster lookup
+- [x] Roster error messages remain substantially consistent with current behavior
+- [x] BridgeContext tests use injectable `VaultGitOps` (no real `git pull` required)
+- [x] All existing `packages/bridge` tests pass
 
 ## Blocked by
 

@@ -1,14 +1,13 @@
 import { defineCommand } from "citty";
+import {
+  prepareBridgeSession,
+  resolveRosterRepo,
+} from "../../bridge-context/bridge-context";
 import { createClaudeDiagnostic } from "../../diagnostic/claude-diagnostic";
 import { DiagnosticError } from "../../diagnostic/errors";
 import { runDiagnostic } from "../../diagnostic/run-diagnostic";
 import { ClaudeNotFoundError } from "../../dispatch/errors";
-import {
-  loadResolvedMissionOrders,
-  resolveVaultConfig,
-  VaultConfigError,
-} from "../../vault/resolve-vault-config";
-import { syncVaultBeforeCommand } from "../../vault/vault-client";
+import { VaultConfigError } from "../../vault/resolve-vault-config";
 
 export const diagnosticCommand = defineCommand({
   meta: {
@@ -27,19 +26,18 @@ export const diagnosticCommand = defineCommand({
     try {
       if (!args.repo) {
         throw new DiagnosticError(
-          "Repository name required. Usage: bridge diagnostic <repo>",
+          "Repository name required. Usage: bridge diagnostic <repo>"
         );
       }
 
-      const { path } = resolveVaultConfig();
-      await syncVaultBeforeCommand(path);
-      const orders = loadResolvedMissionOrders();
+      const { vaultPath, orders } = await prepareBridgeSession();
+      const { name, profile } = resolveRosterRepo(orders, args.repo);
       const agent = createClaudeDiagnostic();
 
       const result = await runDiagnostic({
-        vaultPath: path,
-        orders,
-        repoName: args.repo,
+        vaultPath,
+        repoName: name,
+        profile,
         agent,
       });
 

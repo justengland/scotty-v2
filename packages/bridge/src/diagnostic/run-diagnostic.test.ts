@@ -31,9 +31,7 @@ async function setupRepoWithTwoCommits(): Promise<void> {
   await writeFile(join(repoPath, "README.md"), "# Alpha v1\n");
   await Bun.$`git add -A`.cwd(repoPath).quiet();
   await Bun.$`git commit -m ${"initial"}`.cwd(repoPath).quiet();
-  initialSha = (
-    await Bun.$`git rev-parse HEAD`.cwd(repoPath).quiet()
-  ).stdout
+  initialSha = (await Bun.$`git rev-parse HEAD`.cwd(repoPath).quiet()).stdout
     .toString()
     .trim();
 
@@ -42,9 +40,7 @@ async function setupRepoWithTwoCommits(): Promise<void> {
   await writeFile(join(repoPath, "src", "index.ts"), "export const x = 1;\n");
   await Bun.$`git add -A`.cwd(repoPath).quiet();
   await Bun.$`git commit -m ${"feature"}`.cwd(repoPath).quiet();
-  headSha = (
-    await Bun.$`git rev-parse HEAD`.cwd(repoPath).quiet()
-  ).stdout
+  headSha = (await Bun.$`git rev-parse HEAD`.cwd(repoPath).quiet()).stdout
     .toString()
     .trim();
 }
@@ -66,7 +62,7 @@ async function setupVault(staleSha: string): Promise<void> {
   await writeFile(join(archiveDir, "index.md"), archivePage(staleSha));
   await writeFile(
     join(archiveDir, "captains-log.md"),
-    archivePage(staleSha, "# Captain's Log\n"),
+    archivePage(staleSha, "# Captain's Log\n")
   );
   await initGitRepo(vaultPath);
   await Bun.$`git add -A`.cwd(vaultPath).quiet();
@@ -84,7 +80,7 @@ function mockHailChannel(): HailChannel & { messages: string[] } {
 }
 
 function mockDiagnosticAgent(
-  onPrompt?: (prompt: string) => void,
+  onPrompt?: (prompt: string) => void
 ): DiagnosticAgent & { prompts: string[] } {
   const prompts: string[] = [];
   return {
@@ -96,7 +92,10 @@ function mockDiagnosticAgent(
 
       const archiveDir = join(vaultPath, "archive", repoName);
       const head = headSha;
-      const updatedIndex = archivePage(head, "# Alpha index\n\nUpdated from diff.\n");
+      const updatedIndex = archivePage(
+        head,
+        "# Alpha index\n\nUpdated from diff.\n"
+      );
       await writeFile(join(archiveDir, "index.md"), updatedIndex);
 
       return {
@@ -137,10 +136,7 @@ test("runDiagnostic includes repo diff since archive SHA in Claude prompt", asyn
 
   await runDiagnostic({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: { alpha: { path: repoPath, agent: "claude-code" } },
-    },
+    profile: { path: repoPath, agent: "claude-code" },
     repoName: "alpha",
     agent,
     commitAndPush: async () => {},
@@ -159,10 +155,7 @@ test("runDiagnostic appends Captain's Log, validates, commits, and pushes vault"
 
   const result = await runDiagnostic({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: { alpha: { path: repoPath, agent: "claude-code" } },
-    },
+    profile: { path: repoPath, agent: "claude-code" },
     repoName: "alpha",
     agent,
     commitAndPush: async (path, message) => {
@@ -180,7 +173,7 @@ test("runDiagnostic appends Captain's Log, validates, commits, and pushes vault"
 
   const captainsLog = await readFile(
     join(vaultPath, "archive", "alpha", "captains-log.md"),
-    "utf8",
+    "utf8"
   );
   expect(captainsLog).toContain("## 2026-06-12");
   expect(captainsLog).toContain("mock-diagnostic: archive updated");
@@ -191,7 +184,7 @@ test("validateArchivePages rejects missing frontmatter and stale sources", async
   await setupVault(initialSha);
   await writeFile(
     join(vaultPath, "archive", "alpha", "broken.md"),
-    "# Missing frontmatter\n",
+    "# Missing frontmatter\n"
   );
 
   const errors = await validateArchivePages({
@@ -200,9 +193,9 @@ test("validateArchivePages rejects missing frontmatter and stale sources", async
     repoHeadSha: headSha,
   });
 
-  expect(errors.some((error) => error.includes('missing frontmatter field "entity"'))).toBe(
-    true,
-  );
+  expect(
+    errors.some((error) => error.includes('missing frontmatter field "entity"'))
+  ).toBe(true);
   expect(errors.some((error) => error.includes("stale sources"))).toBe(true);
 });
 
@@ -210,7 +203,7 @@ test("validateArchivePages rejects broken wiki-links", async () => {
   await setupVault(headSha);
   await writeFile(
     join(vaultPath, "archive", "alpha", "index.md"),
-    `${archivePage(headSha, "# Alpha\n\nSee [[Missing Page]].\n")}`,
+    `${archivePage(headSha, "# Alpha\n\nSee [[Missing Page]].\n")}`
   );
 
   const errors = await validateArchivePages({
@@ -231,7 +224,7 @@ test("runDiagnostic hails and exits non-zero when validation fails", async () =>
       const archiveDir = join(vaultPath, "archive", repoName);
       await writeFile(
         join(archiveDir, "index.md"),
-        archivePage(initialSha, "# Alpha\n\nStale sources left in place.\n"),
+        archivePage(initialSha, "# Alpha\n\nStale sources left in place.\n")
       );
       return {
         success: true,
@@ -244,10 +237,7 @@ test("runDiagnostic hails and exits non-zero when validation fails", async () =>
 
   const result = await runDiagnostic({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: { alpha: { path: repoPath, agent: "claude-code" } },
-    },
+    profile: { path: repoPath, agent: "claude-code" },
     repoName: "alpha",
     agent,
     hailChannels: [hail],
@@ -280,10 +270,7 @@ test("runDiagnostic hails when Claude fails", async () => {
 
   const result = await runDiagnostic({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: { alpha: { path: repoPath, agent: "claude-code" } },
-    },
+    profile: { path: repoPath, agent: "claude-code" },
     repoName: "alpha",
     agent,
     hailChannels: [hail],
@@ -305,10 +292,7 @@ test("runDiagnostic does not modify target repository", async () => {
 
   await runDiagnostic({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: { alpha: { path: repoPath, agent: "claude-code" } },
-    },
+    profile: { path: repoPath, agent: "claude-code" },
     repoName: "alpha",
     agent,
     commitAndPush: async () => {},

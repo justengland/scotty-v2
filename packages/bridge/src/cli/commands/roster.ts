@@ -1,12 +1,10 @@
 import { defineCommand } from "citty";
+import { prepareBridgeSession } from "../../bridge-context/bridge-context";
 import { formatDutyRoster } from "../../roster/format-roster";
 import {
-  loadResolvedMissionOrders,
   resolveRepoProfile,
-  resolveVaultConfig,
   VaultConfigError,
 } from "../../vault/resolve-vault-config";
-import { syncVaultBeforeCommand } from "../../vault/vault-client";
 
 export const rosterCommand = defineCommand({
   meta: {
@@ -23,13 +21,13 @@ export const rosterCommand = defineCommand({
   },
   async run({ args }) {
     try {
-      const { path } = resolveVaultConfig();
-      await syncVaultBeforeCommand(path);
-      const orders = loadResolvedMissionOrders();
+      const { orders } = await prepareBridgeSession();
 
       if (args.repo) {
         const { name, profile } = resolveRepoProfile(orders, args.repo);
-        console.log(formatDutyRoster({ vault: orders.vault, repos: { [name]: profile } }));
+        console.log(
+          formatDutyRoster({ vault: orders.vault, repos: { [name]: profile } })
+        );
         return;
       }
 

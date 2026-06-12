@@ -1,9 +1,8 @@
-import type { MissionOrders } from "../mission-orders/types";
+import type { RepoProfile } from "../mission-orders/types";
 import { createHailChannels, sendFailureHail } from "../hailing/send-hail";
 import type { HailChannel } from "../hailing/types";
 import { resolveVerifier } from "../tricorder/registry";
 import type { VerificationResult } from "../tricorder/types";
-import { VaultConfigError } from "../vault/resolve-vault-config";
 import { commitVaultLocally } from "../vault/commit-vault";
 import {
   resolveAwayTeam,
@@ -16,8 +15,8 @@ import { appendEngineeringLogEntry } from "./engineering-log";
 
 export interface DispatchInput {
   vaultPath: string;
-  orders: MissionOrders;
   repoName: string;
+  profile: RepoProfile;
   title?: string;
   description?: string;
   file?: string;
@@ -52,19 +51,14 @@ function summarizeExecution(
 export async function runDispatch(
   input: DispatchInput
 ): Promise<DispatchResult> {
-  const profile = input.orders.repos[input.repoName];
-  if (!profile) {
-    throw new VaultConfigError(
-      `Repository "${input.repoName}" is not on the Duty Roster. Check Mission Orders for available repos.`
-    );
-  }
-
+  const profile = input.profile;
   if (!profile.path) {
     throw new DispatchError(
       `Repository "${input.repoName}" has no local path in Mission Orders.`
     );
   }
 
+  const repoPath = profile.path;
   const awayTeam =
     input.awayTeam ?? resolveAwayTeam(profile.agent, input.awayTeamDeps);
 
@@ -80,12 +74,12 @@ export async function runDispatch(
     contextDepth: input.contextDepth,
   });
 
-  const result = await awayTeam.execute(task, profile.path);
+  const result = await awayTeam.execute(task, repoPath);
 
   let verification: VerificationResult | undefined;
   if (profile.verify && !input.skipVerify) {
     const verifier = resolveVerifier(profile.verify);
-    verification = await verifier.verify(profile.path);
+    verification = await verifier.verify(repoPath);
   }
 
   const dispatchSucceeded = verification ? verification.passed : result.success;

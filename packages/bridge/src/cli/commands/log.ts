@@ -1,11 +1,8 @@
 import { defineCommand } from "citty";
+import { prepareBridgeSession } from "../../bridge-context/bridge-context";
 import { formatLogEntries } from "../../log/format-log";
 import { readEngineeringLog } from "../../log/read-log";
-import {
-  resolveVaultConfig,
-  VaultConfigError,
-} from "../../vault/resolve-vault-config";
-import { syncVaultBeforeCommand } from "../../vault/vault-client";
+import { VaultConfigError } from "../../vault/resolve-vault-config";
 
 export const logCommand = defineCommand({
   meta: {
@@ -31,8 +28,7 @@ export const logCommand = defineCommand({
   },
   async run({ args }) {
     try {
-      const { path } = resolveVaultConfig();
-      await syncVaultBeforeCommand(path);
+      const { vaultPath } = await prepareBridgeSession();
 
       const limit = args.limit ? Number(args.limit) : undefined;
       if (limit !== undefined && (!Number.isFinite(limit) || limit < 1)) {
@@ -41,7 +37,7 @@ export const logCommand = defineCommand({
         return;
       }
 
-      const entries = await readEngineeringLog(path, {
+      const entries = await readEngineeringLog(vaultPath, {
         repo: args.repo,
         since: args.since,
         limit,

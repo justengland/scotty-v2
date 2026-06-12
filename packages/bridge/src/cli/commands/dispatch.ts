@@ -1,12 +1,11 @@
 import { defineCommand } from "citty";
+import {
+  prepareBridgeSession,
+  resolveRosterRepo,
+} from "../../bridge-context/bridge-context";
 import { DispatchError } from "../../dispatch/errors";
 import { runDispatch } from "../../dispatch/run-dispatch";
-import {
-  loadResolvedMissionOrders,
-  resolveVaultConfig,
-  VaultConfigError,
-} from "../../vault/resolve-vault-config";
-import { syncVaultBeforeCommand } from "../../vault/vault-client";
+import { VaultConfigError } from "../../vault/resolve-vault-config";
 
 function parseOptionalNumber(
   value: string | undefined,
@@ -102,14 +101,13 @@ export const dispatchCommand = defineCommand({
         "Context depth"
       );
 
-      const { path } = resolveVaultConfig();
-      await syncVaultBeforeCommand(path);
-      const orders = loadResolvedMissionOrders();
+      const { vaultPath, orders } = await prepareBridgeSession();
+      const { name, profile } = resolveRosterRepo(orders, repoName);
 
       const result = await runDispatch({
-        vaultPath: path,
-        orders,
-        repoName,
+        vaultPath,
+        repoName: name,
+        profile,
         title: args.title,
         description: args.description,
         file: args.file,

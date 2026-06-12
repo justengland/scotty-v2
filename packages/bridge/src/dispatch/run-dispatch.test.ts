@@ -63,14 +63,9 @@ test("runDispatch skips Tricorder when repo has no verifier", async () => {
 
   const result = await runDispatch({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: {
-        alpha: {
-          path: repoPath,
-          agent: "claude-code",
-        },
-      },
+    profile: {
+      path: repoPath,
+      agent: "claude-code",
     },
     repoName: "alpha",
     title: "No verify",
@@ -92,15 +87,10 @@ test("runDispatch uses Tricorder result when verify is configured", async () => 
 
   const result = await runDispatch({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: {
-        alpha: {
-          path: repoPath,
-          agent: "claude-code",
-          verify: "bun",
-        },
-      },
+    profile: {
+      path: repoPath,
+      agent: "claude-code",
+      verify: "bun",
     },
     repoName: "alpha",
     title: "Verify pass",
@@ -122,15 +112,10 @@ test("runDispatch fails when Tricorder fails", async () => {
 
   const result = await runDispatch({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: {
-        alpha: {
-          path: repoPath,
-          agent: "claude-code",
-          verify: "bun",
-        },
-      },
+    profile: {
+      path: repoPath,
+      agent: "claude-code",
+      verify: "bun",
     },
     repoName: "alpha",
     title: "Verify fail",
@@ -153,15 +138,10 @@ test("runDispatch honors --skip-verify", async () => {
 
   const result = await runDispatch({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: {
-        alpha: {
-          path: repoPath,
-          agent: "claude-code",
-          verify: "bun",
-        },
-      },
+    profile: {
+      path: repoPath,
+      agent: "claude-code",
+      verify: "bun",
     },
     repoName: "alpha",
     title: "Skip verify",
@@ -183,15 +163,10 @@ test("runDispatch runs markdown verifier for verify = markdown", async () => {
 
   const result = await runDispatch({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: {
-        alpha: {
-          path: repoPath,
-          agent: "claude-code",
-          verify: "markdown",
-        },
-      },
+    profile: {
+      path: repoPath,
+      agent: "claude-code",
+      verify: "markdown",
     },
     repoName: "alpha",
     title: "Markdown verify",
@@ -213,15 +188,10 @@ test("runDispatch hails on Tricorder failure with repo and summary", async () =>
 
   const result = await runDispatch({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: {
-        alpha: {
-          path: repoPath,
-          agent: "claude-code",
-          verify: "bun",
-        },
-      },
+    profile: {
+      path: repoPath,
+      agent: "claude-code",
+      verify: "bun",
     },
     repoName: "alpha",
     title: "Verify fail",
@@ -244,14 +214,9 @@ test("runDispatch hails on Away Team crash when no verifier", async () => {
 
   const result = await runDispatch({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: {
-        alpha: {
-          path: repoPath,
-          agent: "claude-code",
-        },
-      },
+    profile: {
+      path: repoPath,
+      agent: "claude-code",
     },
     repoName: "alpha",
     title: "Away Team fail",
@@ -273,15 +238,10 @@ test("runDispatch does not hail on success", async () => {
 
   const result = await runDispatch({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: {
-        alpha: {
-          path: repoPath,
-          agent: "claude-code",
-          verify: "bun",
-        },
-      },
+    profile: {
+      path: repoPath,
+      agent: "claude-code",
+      verify: "bun",
     },
     repoName: "alpha",
     title: "Success",
@@ -300,15 +260,10 @@ test("runDispatch does not hail when Tricorder passes despite Away Team failure"
 
   const result = await runDispatch({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: {
-        alpha: {
-          path: repoPath,
-          agent: "claude-code",
-          verify: "bun",
-        },
-      },
+    profile: {
+      path: repoPath,
+      agent: "claude-code",
+      verify: "bun",
     },
     repoName: "alpha",
     title: "Tricorder wins",
@@ -365,14 +320,9 @@ test("runDispatch routes cursor agent through CursorTeam with mocked SDK", async
 
   const result = await runDispatch({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: {
-        alpha: {
-          path: repoPath,
-          agent: "cursor",
-        },
-      },
+    profile: {
+      path: repoPath,
+      agent: "cursor",
     },
     repoName: "alpha",
     title: "Cursor dispatch",
@@ -426,15 +376,10 @@ test("runDispatch with contextDepth includes traversed wiki-link pages", async (
 
   const result = await runDispatch({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: {
-        alpha: {
-          path: repoPath,
-          agent: "claude-code",
-          contextDepth: 2,
-        },
-      },
+    profile: {
+      path: repoPath,
+      agent: "claude-code",
+      contextDepth: 2,
     },
     repoName: "alpha",
     title: "Wiki context",
@@ -465,15 +410,10 @@ test("runDispatch aborts on broken wiki-link before Away Team execution", async 
   await expect(
     runDispatch({
       vaultPath,
-      orders: {
-        vault: {},
-        repos: {
-          alpha: {
-            path: repoPath,
-            agent: "claude-code",
-            contextDepth: 1,
-          },
-        },
+      profile: {
+        path: repoPath,
+        agent: "claude-code",
+        contextDepth: 1,
       },
       repoName: "alpha",
       title: "Broken link",
@@ -549,15 +489,10 @@ test("runDispatch wiki-link traversal works with CursorTeam", async () => {
 
   const result = await runDispatch({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: {
-        alpha: {
-          path: repoPath,
-          agent: "cursor",
-          contextDepth: 1,
-        },
-      },
+    profile: {
+      path: repoPath,
+      agent: "cursor",
+      contextDepth: 1,
     },
     repoName: "alpha",
     title: "Cursor wiki context",
@@ -602,14 +537,9 @@ test("runDispatch builds Task from issue file through full pipeline", async () =
 
   const result = await runDispatch({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: {
-        alpha: {
-          path: repoPath,
-          agent: "claude-code",
-        },
-      },
+    profile: {
+      path: repoPath,
+      agent: "claude-code",
     },
     repoName: "alpha",
     issue: issuePath,
@@ -671,14 +601,9 @@ test("runDispatch issue sourcing works with CursorTeam agent profile", async () 
 
   const result = await runDispatch({
     vaultPath,
-    orders: {
-      vault: {},
-      repos: {
-        alpha: {
-          path: repoPath,
-          agent: "cursor",
-        },
-      },
+    profile: {
+      path: repoPath,
+      agent: "cursor",
     },
     repoName: "alpha",
     issue: issuePath,

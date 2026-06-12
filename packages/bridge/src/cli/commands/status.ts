@@ -1,12 +1,8 @@
 import { defineCommand } from "citty";
+import { prepareBridgeSession } from "../../bridge-context/bridge-context";
 import { formatFleetStatus } from "../../status/format-status";
 import { readFleetStatus } from "../../status/read-status";
-import {
-  loadResolvedMissionOrders,
-  resolveVaultConfig,
-  VaultConfigError,
-} from "../../vault/resolve-vault-config";
-import { syncVaultBeforeCommand } from "../../vault/vault-client";
+import { VaultConfigError } from "../../vault/resolve-vault-config";
 
 export const statusCommand = defineCommand({
   meta: {
@@ -16,11 +12,9 @@ export const statusCommand = defineCommand({
   },
   async run() {
     try {
-      const { path } = resolveVaultConfig();
-      await syncVaultBeforeCommand(path);
-      const orders = loadResolvedMissionOrders();
+      const { vaultPath, orders } = await prepareBridgeSession();
       const repoNames = Object.keys(orders.repos);
-      const statuses = await readFleetStatus(path, repoNames);
+      const statuses = await readFleetStatus(vaultPath, repoNames);
 
       console.log(formatFleetStatus(statuses));
     } catch (error) {

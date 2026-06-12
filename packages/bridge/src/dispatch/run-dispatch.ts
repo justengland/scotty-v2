@@ -22,6 +22,7 @@ export interface DispatchInput {
   description?: string;
   file?: string;
   priority?: number;
+  contextDepth?: number;
   skipVerify?: boolean;
   awayTeam?: AwayTeam;
   awayTeamDeps?: AwayTeamRegistryDeps;
@@ -74,6 +75,7 @@ export async function runDispatch(
     description: input.description,
     file: input.file,
     priority: input.priority,
+    contextDepth: input.contextDepth,
   });
 
   const result = await awayTeam.execute(task, profile.path);

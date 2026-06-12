@@ -392,3 +392,181 @@ test("runDispatch routes cursor agent through CursorTeam with mocked SDK", async
   expect(logContent).toContain("dispatch: alpha");
   expect(logContent).toContain("Cursor dispatch");
 });
+
+test("runDispatch with contextDepth includes traversed wiki-link pages", async () => {
+  const repoPath = join(tempRoot, "context-repo");
+  await mkdir(repoPath, { recursive: true });
+  let capturedContextPaths: string[] = [];
+
+  await writeFile(
+    join(vaultPath, "archive", "alpha", "index.md"),
+    "# Alpha\n\nSee [[architecture]].\n"
+  );
+  await writeFile(
+    join(vaultPath, "archive", "alpha", "architecture.md"),
+    "# Architecture\n\nSee [[decision]].\n"
+  );
+  await writeFile(
+    join(vaultPath, "archive", "alpha", "decision.md"),
+    "# Decision\n\nFinal.\n"
+  );
+
+  const awayTeam: AwayTeam = {
+    id: "mock",
+    async execute(task) {
+      capturedContextPaths = task.contextFiles.map((file) => file.path);
+      return {
+        success: true,
+        stdout: "away-team ok",
+        stderr: "",
+        durationMs: 5,
+      };
+    },
+  };
+
+  const result = await runDispatch({
+    vaultPath,
+    orders: {
+      vault: {},
+      repos: {
+        alpha: {
+          path: repoPath,
+          agent: "claude-code",
+          contextDepth: 2,
+        },
+      },
+    },
+    repoName: "alpha",
+    title: "Wiki context",
+    description: "Traverse archive links.",
+    awayTeam,
+    hailChannels: [],
+  });
+
+  expect(result.exitCode).toBe(0);
+  expect(capturedContextPaths).toEqual([
+    "archive/alpha/index.md",
+    "archive/alpha/captains-log.md",
+    "archive/alpha/architecture.md",
+    "archive/alpha/decision.md",
+  ]);
+});
+
+test("runDispatch aborts on broken wiki-link before Away Team execution", async () => {
+  const repoPath = join(tempRoot, "broken-link-repo");
+  await mkdir(repoPath, { recursive: true });
+  let awayTeamRan = false;
+
+  await writeFile(
+    join(vaultPath, "archive", "alpha", "index.md"),
+    "# Alpha\n\nSee [[Missing Page]].\n"
+  );
+
+  await expect(
+    runDispatch({
+      vaultPath,
+      orders: {
+        vault: {},
+        repos: {
+          alpha: {
+            path: repoPath,
+            agent: "claude-code",
+            contextDepth: 1,
+          },
+        },
+      },
+      repoName: "alpha",
+      title: "Broken link",
+      description: "Should fail before Away Team.",
+      awayTeam: {
+        id: "mock",
+        async execute() {
+          awayTeamRan = true;
+          return {
+            success: true,
+            stdout: "",
+            stderr: "",
+            durationMs: 1,
+          };
+        },
+      },
+      hailChannels: [],
+    })
+  ).rejects.toThrow("broken wiki-link to [[Missing Page]]");
+
+  expect(awayTeamRan).toBe(false);
+});
+
+test("runDispatch wiki-link traversal works with CursorTeam", async () => {
+  const repoPath = join(tempRoot, "cursor-wiki-repo");
+  await mkdir(repoPath, { recursive: true });
+  let capturedPrompt: string | undefined;
+
+  await writeFile(
+    join(vaultPath, "archive", "alpha", "index.md"),
+    "# Alpha\n\nSee [[architecture]].\n"
+  );
+  await writeFile(
+    join(vaultPath, "archive", "alpha", "architecture.md"),
+    "# Architecture\n\nDetails.\n"
+  );
+
+  const cursorTeam = createCursorTeam({
+    env: {
+      CURSOR_API_KEY: "cursor_test_key",
+      SCOTTY_CURSOR_STREAM_LOG: "0",
+    },
+    createAgent: async () => ({
+      agentId: "agent-1",
+      model: undefined,
+      async send(message: string) {
+        capturedPrompt = message;
+        return {
+          id: "run-1",
+          agentId: "agent-1",
+          supports: () => true,
+          unsupportedReason: () => undefined,
+          async *stream() {},
+          conversation: async () => [],
+          wait: async () => ({
+            id: "run-1",
+            status: "finished" as const,
+            result: "cursor ok",
+            durationMs: 12,
+          }),
+          cancel: async () => {},
+          status: "finished" as const,
+          onDidChangeStatus: () => () => {},
+        };
+      },
+      close: () => {},
+      reload: async () => {},
+      [Symbol.asyncDispose]: async () => {},
+      listArtifacts: async () => [],
+      downloadArtifact: async () => Buffer.from(""),
+    }),
+  });
+
+  const result = await runDispatch({
+    vaultPath,
+    orders: {
+      vault: {},
+      repos: {
+        alpha: {
+          path: repoPath,
+          agent: "cursor",
+          contextDepth: 1,
+        },
+      },
+    },
+    repoName: "alpha",
+    title: "Cursor wiki context",
+    description: "Traverse via CursorTeam.",
+    awayTeam: cursorTeam,
+    hailChannels: [],
+  });
+
+  expect(result.exitCode).toBe(0);
+  expect(capturedPrompt).toContain("### archive/alpha/architecture.md");
+  expect(capturedPrompt).toContain("# Architecture");
+});

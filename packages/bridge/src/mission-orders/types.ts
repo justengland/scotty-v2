@@ -8,6 +8,7 @@ export interface RepoProfile {
   agent: string;
   verify?: string;
   context?: string[];
+  contextDepth?: number;
 }
 
 export interface MissionOrders {

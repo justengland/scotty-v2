@@ -40,6 +40,11 @@ export const dispatchCommand = defineCommand({
       description: "Task priority (default 0)",
       alias: "p",
     },
+    "context-depth": {
+      type: "string",
+      description:
+        "Wiki-link traversal depth for Archive context (default 0; overrides Mission Orders)",
+    },
     "skip-verify": {
       type: "boolean",
       description: "Skip Tricorder verification",
@@ -59,6 +64,14 @@ export const dispatchCommand = defineCommand({
         throw new DispatchError("Priority must be a number.");
       }
 
+      const contextDepth =
+        args["context-depth"] !== undefined
+          ? Number(args["context-depth"])
+          : undefined;
+      if (contextDepth !== undefined && Number.isNaN(contextDepth)) {
+        throw new DispatchError("Context depth must be a number.");
+      }
+
       const { path } = resolveVaultConfig();
       await syncVaultBeforeCommand(path);
       const orders = loadResolvedMissionOrders();
@@ -71,6 +84,7 @@ export const dispatchCommand = defineCommand({
         description: args.description,
         file: args.file,
         priority,
+        contextDepth,
         skipVerify: args["skip-verify"],
       });
 

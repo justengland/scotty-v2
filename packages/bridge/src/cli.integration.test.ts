@@ -15,6 +15,7 @@ let originalStdoutWrite: typeof process.stdout.write;
 let originalStderrWrite: typeof process.stderr.write;
 let originalConsoleLog: typeof console.log;
 let originalConsoleError: typeof console.error;
+let originalFetch: typeof globalThis.fetch;
 
 beforeEach(async () => {
   stdout = [];
@@ -22,12 +23,14 @@ beforeEach(async () => {
   originalStderrWrite = process.stderr.write;
   originalConsoleLog = console.log;
   originalConsoleError = console.error;
+  originalFetch = globalThis.fetch;
   originalEnv = {
     SCOTTY_VAULT_PATH: process.env.SCOTTY_VAULT_PATH,
     SCOTTY_VAULT_REMOTE: process.env.SCOTTY_VAULT_REMOTE,
     HOME: process.env.HOME,
     PATH: process.env.PATH,
     SCOTTY_CLAUDE_PATH: process.env.SCOTTY_CLAUDE_PATH,
+    DISCORD_WEBHOOK_URL: process.env.DISCORD_WEBHOOK_URL,
   };
 
   tempRoot = join(tmpdir(), `bridge-cli-${crypto.randomUUID()}`);
@@ -54,6 +57,7 @@ afterEach(async () => {
   process.stderr.write = originalStderrWrite;
   console.log = originalConsoleLog;
   console.error = originalConsoleError;
+  globalThis.fetch = originalFetch;
 
   for (const [key, value] of Object.entries(originalEnv)) {
     if (value === undefined) {
@@ -113,6 +117,16 @@ exit 0
   const scriptPath = join(mockBinDir, "claude");
   await writeFile(scriptPath, script);
   await chmod(scriptPath, 0o755);
+}
+
+function installMockDiscordWebhook(): { payloads: string[] } {
+  const payloads: string[] = [];
+  process.env.DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/test/token";
+  globalThis.fetch = (async (_url, init) => {
+    payloads.push(String(init?.body));
+    return new Response("", { status: 204 });
+  }) as typeof fetch;
+  return { payloads };
 }
 
 async function setupDispatchFixtures(): Promise<void> {
@@ -284,6 +298,7 @@ test("bridge dispatch errors when claude is not on PATH", async () => {
 
 test("bridge dispatch fails when Tricorder fails and logs verification", async () => {
   await setupDispatchFixtures();
+  const { payloads } = installMockDiscordWebhook();
   await writeFile(
     join(repoPath, "passing.test.ts"),
     `import { expect, test } from "bun:test";
@@ -314,6 +329,10 @@ test("fails", () => {
   const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
   expect(logContent).toContain("**Tricorder:** failed");
   expect(await Bun.file(markerPath).text()).toBe("inspect-me");
+  expect(payloads).toHaveLength(1);
+  const hailBody = JSON.parse(payloads[0]!);
+  expect(hailBody.content).toContain("alpha");
+  expect(hailBody.content).toContain("Tricorder failure");
 });
 
 test("bridge dispatch succeeds when Tricorder passes despite Away Team failure", async () => {
@@ -468,4 +487,109 @@ agent = "claude-code"
   const logFiles = (await readdir(logDir)).filter((name) => name.endsWith(".md"));
   const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
   expect(logContent).not.toContain("**Tricorder:**");
+});
+
+test("bridge hail sends test Discord message when webhook is configured", async () => {
+  const { payloads } = installMockDiscordWebhook();
+
+  await runCommand(bridgeCommand, { rawArgs: ["hail"] });
+
+  const output = stdout.join("\n");
+  expect(output).toContain("Test hail sent");
+  expect(payloads).toHaveLength(1);
+  const hailBody = JSON.parse(payloads[0]!);
+  expect(hailBody.content).toContain("Scotty Hail");
+  expect(hailBody.content).toContain("Test hail");
+  expect(hailBody.username).toBe("Scotty");
+});
+
+test("bridge hail errors when DISCORD_WEBHOOK_URL is missing", async () => {
+  delete process.env.DISCORD_WEBHOOK_URL;
+
+  await runCommand(bridgeCommand, { rawArgs: ["hail"] });
+
+  const output = stdout.join("\n");
+  expect(output).toContain("DISCORD_WEBHOOK_URL is not set");
+  expect(process.exitCode).toBe(1);
+});
+
+test("bridge dispatch hails on Away Team crash when repo has no verifier", async () => {
+  const betaPath = join(tempRoot, "beta-repo");
+  await mkdir(betaPath, { recursive: true });
+  await writeOrders();
+  await mkdir(join(vaultPath, "archive", "beta"), { recursive: true });
+  await writeFile(join(vaultPath, "archive", "beta", "index.md"), "# Beta\n");
+  await writeFile(join(vaultPath, "archive", "beta", "captains-log.md"), "# Log\n");
+  await writeFile(
+    join(vaultPath, "orders", "local.toml"),
+    `[vault]
+path = "${vaultPath}"
+
+[repos.alpha]
+path = "${repoPath}"
+
+[repos.beta]
+path = "${betaPath}"
+`,
+  );
+  await writeFile(
+    join(vaultPath, "orders", "mission-orders.toml"),
+    `[vault]
+remote = "git@github.com:example/scotty-vault.git"
+
+[repos.beta]
+agent = "claude-code"
+`,
+  );
+  await Bun.$`git init`.cwd(vaultPath).quiet();
+  await Bun.$`git config user.email test@example.com`.cwd(vaultPath).quiet();
+  await Bun.$`git config user.name Test`.cwd(vaultPath).quiet();
+  await installMockClaude();
+  await writeFile(
+    join(mockBinDir, "claude"),
+    `#!/bin/sh
+echo "mock-claude: crashed" >&2
+exit 1
+`,
+  );
+  await chmod(join(mockBinDir, "claude"), 0o755);
+  process.env.SCOTTY_CLAUDE_PATH = join(mockBinDir, "claude");
+  const { payloads } = installMockDiscordWebhook();
+
+  await runCommand(bridgeCommand, {
+    rawArgs: [
+      "dispatch",
+      "beta",
+      "--title",
+      "Away Team crash",
+      "--description",
+      "No verifier configured.",
+    ],
+  });
+
+  expect(process.exitCode).toBe(1);
+  expect(payloads).toHaveLength(1);
+  const hailBody = JSON.parse(payloads[0]!);
+  expect(hailBody.content).toContain("beta");
+  expect(hailBody.content).toContain("Away Team crash");
+  expect(hailBody.content).toContain("mock-claude: crashed");
+});
+
+test("successful bridge dispatch does not hail", async () => {
+  await setupDispatchFixtures();
+  const { payloads } = installMockDiscordWebhook();
+
+  await runCommand(bridgeCommand, {
+    rawArgs: [
+      "dispatch",
+      "alpha",
+      "--title",
+      "All good",
+      "--description",
+      "Should not hail.",
+    ],
+  });
+
+  expect(process.exitCode).toBe(0);
+  expect(payloads).toHaveLength(0);
 });

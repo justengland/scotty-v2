@@ -1,4 +1,9 @@
 import type { MissionOrders } from "../mission-orders/types";
+import {
+  createHailChannels,
+  sendFailureHail,
+} from "../hailing/send-hail";
+import type { HailChannel } from "../hailing/types";
 import { resolveVerifier } from "../tricorder/registry";
 import type { VerificationResult } from "../tricorder/types";
 import { VaultConfigError } from "../vault/resolve-vault-config";
@@ -18,6 +23,7 @@ export interface DispatchInput {
   priority?: number;
   skipVerify?: boolean;
   awayTeam: AwayTeam;
+  hailChannels?: HailChannel[];
 }
 
 export interface DispatchResult {
@@ -93,6 +99,27 @@ export async function runDispatch(input: DispatchInput): Promise<DispatchResult>
     input.vaultPath,
     `dispatch: ${input.repoName} — ${task.title}`,
   );
+
+  if (!dispatchSucceeded) {
+    const configuredChannels =
+      input.hailChannels !== undefined
+        ? input.hailChannels
+        : createHailChannels();
+    const channels =
+      input.hailChannels === undefined && configuredChannels.length === 0
+        ? null
+        : configuredChannels;
+    const hailKind =
+      verification && !verification.passed
+        ? ("tricorder-failure" as const)
+        : ("away-team-crash" as const);
+    await sendFailureHail({
+      channels,
+      kind: hailKind,
+      repo: input.repoName,
+      summary,
+    });
+  }
 
   return {
     exitCode: dispatchSucceeded ? 0 : 1,

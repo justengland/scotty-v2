@@ -41,8 +41,26 @@ for (const { name, command, term } of COMMAND_HELP_CASES) {
   });
 }
 
-for (const name of ["diagnostic", "hail"] as const) {
+for (const name of ["diagnostic"] as const) {
   test(`stub ${name} command completes without error`, async () => {
     await runCommand(bridgeCommand, { rawArgs: [name] });
   });
 }
+
+test("bridge hail completes when DISCORD_WEBHOOK_URL is configured", async () => {
+  const originalWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
+  const originalFetch = globalThis.fetch;
+  process.env.DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/test/token";
+  globalThis.fetch = (async () => new Response("", { status: 204 })) as unknown as typeof fetch;
+
+  try {
+    await runCommand(bridgeCommand, { rawArgs: ["hail"] });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalWebhookUrl === undefined) {
+      delete process.env.DISCORD_WEBHOOK_URL;
+    } else {
+      process.env.DISCORD_WEBHOOK_URL = originalWebhookUrl;
+    }
+  }
+});

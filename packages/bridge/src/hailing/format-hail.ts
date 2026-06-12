@@ -1,8 +1,6 @@
-export type HailKind =
-  | "test"
-  | "away-team-crash"
-  | "tricorder-failure"
-  | "diagnostic-failure";
+import type { HailKind } from "./types";
+
+export type { HailKind };
 
 const KIND_LABEL: Record<HailKind, string> = {
   test: "Test hail",

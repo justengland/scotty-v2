@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ -z "${1:-}" ]]; then
+  echo "Usage: afk-ralph <iterations>"
+  echo "       AGENT=cursor-agent afk-ralph <iterations>  # default: claude"
+  exit 1
+fi
+
+iterations="$1"
+script_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+# shellcheck source=common.sh
+source "${script_dir}/common.sh"
+
+once_script="$(ralph_agent_once_script "$script_dir")"
+
+if [[ ! -x "$once_script" ]]; then
+  echo "Unknown agent: ${AGENT:-claude} (missing ${once_script})"
+  exit 1
+fi
+
+for ((i=1; i<=iterations; i++)); do
+  result=$("$once_script" --print)
+
+  echo "$result"
+
+  if [[ "$result" == *"<promise>COMPLETE</promise>"* ]]; then
+    echo "Ralph finished: PRD complete after $i iteration(s)."
+    exit 0
+  fi
+done
+
+echo "Ralph stopped: ran out of iterations ($iterations max)."
+exit 1

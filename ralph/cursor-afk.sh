@@ -1,18 +1,12 @@
 #!/bin/bash
 set -eo pipefail
 
-if [ -z "$1" ]; then
-  echo "Usage: $0 <iterations>"
-  exit 1
-fi
+iterations="${1:-2}"
 
-# jq filter to extract streaming text from assistant messages
-stream_text='select(.type == "assistant").message.content[]? | select(.type == "text").text // empty | gsub("\n"; "\r\n") | . + "\r\n\n"'
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # jq filter to extract final result
 final_result='select(.type == "result").result // empty'
-
-iterations="$1"
 
 for ((i=1; i<=iterations; i++)); do
   tmpfile=$(mktemp)
@@ -22,14 +16,14 @@ for ((i=1; i<=iterations; i++)); do
   issues=$(cat issues/*.md 2>/dev/null || echo "No issues found")
   prompt=$(cat ralph/prompt.md)
 
-  docker sandbox run claude . -- \
-    --verbose \
-    --print \
+  agent -p \
+    --force \
     --output-format stream-json \
+    --stream-partial-output \
     "Previous commits: $commits Issues: $issues $prompt" \
   | grep --line-buffered '^{' \
   | tee "$tmpfile" \
-  | jq --unbuffered -rj "$stream_text"
+  | jq --unbuffered -rj -f "$SCRIPT_DIR/format-chat.jq"
 
   result=$(jq -r "$final_result" "$tmpfile")
 

@@ -570,3 +570,123 @@ test("runDispatch wiki-link traversal works with CursorTeam", async () => {
   expect(capturedPrompt).toContain("### archive/alpha/architecture.md");
   expect(capturedPrompt).toContain("# Architecture");
 });
+
+const sampleIssue = `# Ship from issue
+
+**Status:** ready-for-agent
+
+## What to build
+
+Implement the tracer bullet end to end.
+`;
+
+test("runDispatch builds Task from issue file through full pipeline", async () => {
+  const repoPath = join(tempRoot, "issue-repo");
+  await mkdir(repoPath, { recursive: true });
+  const issuePath = join(tempRoot, "issue.md");
+  await writeFile(issuePath, sampleIssue);
+  let capturedTitle: string | undefined;
+
+  const awayTeam: AwayTeam = {
+    id: "mock",
+    async execute(task) {
+      capturedTitle = task.title;
+      return {
+        success: true,
+        stdout: "away-team ok",
+        stderr: "",
+        durationMs: 5,
+      };
+    },
+  };
+
+  const result = await runDispatch({
+    vaultPath,
+    orders: {
+      vault: {},
+      repos: {
+        alpha: {
+          path: repoPath,
+          agent: "claude-code",
+        },
+      },
+    },
+    repoName: "alpha",
+    issue: issuePath,
+    awayTeam,
+    hailChannels: [],
+  });
+
+  expect(result.exitCode).toBe(0);
+  expect(capturedTitle).toBe("Ship from issue");
+
+  const logDir = join(vaultPath, "log");
+  const logFiles = await readdir(logDir);
+  const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
+  expect(logContent).toContain("Ship from issue");
+});
+
+test("runDispatch issue sourcing works with CursorTeam agent profile", async () => {
+  const repoPath = join(tempRoot, "cursor-issue-repo");
+  await mkdir(repoPath, { recursive: true });
+  const issuePath = join(tempRoot, "cursor-issue.md");
+  await writeFile(issuePath, sampleIssue);
+  let capturedPrompt: string | undefined;
+
+  const cursorTeam = createCursorTeam({
+    env: {
+      CURSOR_API_KEY: "cursor_test_key",
+      SCOTTY_CURSOR_STREAM_LOG: "0",
+    },
+    createAgent: async () => ({
+      agentId: "agent-1",
+      model: undefined,
+      async send(message: string) {
+        capturedPrompt = message;
+        return {
+          id: "run-1",
+          agentId: "agent-1",
+          supports: () => true,
+          unsupportedReason: () => undefined,
+          async *stream() {},
+          conversation: async () => [],
+          wait: async () => ({
+            id: "run-1",
+            status: "finished" as const,
+            result: "cursor ok",
+            durationMs: 12,
+          }),
+          cancel: async () => {},
+          status: "finished" as const,
+          onDidChangeStatus: () => () => {},
+        };
+      },
+      close: () => {},
+      reload: async () => {},
+      [Symbol.asyncDispose]: async () => {},
+      listArtifacts: async () => [],
+      downloadArtifact: async () => Buffer.from(""),
+    }),
+  });
+
+  const result = await runDispatch({
+    vaultPath,
+    orders: {
+      vault: {},
+      repos: {
+        alpha: {
+          path: repoPath,
+          agent: "cursor",
+        },
+      },
+    },
+    repoName: "alpha",
+    issue: issuePath,
+    awayTeam: cursorTeam,
+    hailChannels: [],
+  });
+
+  expect(result.exitCode).toBe(0);
+  expect(capturedPrompt).toContain("# Task: Ship from issue");
+  expect(capturedPrompt).toContain("Implement the tracer bullet end to end.");
+});

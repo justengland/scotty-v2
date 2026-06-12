@@ -21,6 +21,7 @@ export interface DispatchInput {
   title?: string;
   description?: string;
   file?: string;
+  issue?: string;
   priority?: number;
   contextDepth?: number;
   skipVerify?: boolean;
@@ -74,6 +75,7 @@ export async function runDispatch(
     title: input.title,
     description: input.description,
     file: input.file,
+    issue: input.issue,
     priority: input.priority,
     contextDepth: input.contextDepth,
   });

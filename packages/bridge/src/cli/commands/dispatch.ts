@@ -8,6 +8,42 @@ import {
 } from "../../vault/resolve-vault-config";
 import { syncVaultBeforeCommand } from "../../vault/vault-client";
 
+function parseOptionalNumber(
+  value: string | undefined,
+  label: string
+): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) {
+    throw new DispatchError(`${label} must be a number.`);
+  }
+  return parsed;
+}
+
+function validateDispatchArgs(args: {
+  repo?: string;
+  title?: string;
+  description?: string;
+  file?: string;
+  issue?: string;
+}): string {
+  if (!args.repo) {
+    throw new DispatchError(
+      'Repository name required. Usage: bridge dispatch <repo> --title "..." --description "..."'
+    );
+  }
+
+  if (args.issue && (args.title || args.description || args.file)) {
+    throw new DispatchError(
+      "--issue cannot be combined with --title, --description, or --file"
+    );
+  }
+
+  return args.repo;
+}
+
 export const dispatchCommand = defineCommand({
   meta: {
     name: "dispatch",
@@ -35,6 +71,12 @@ export const dispatchCommand = defineCommand({
       description: "Path to a markdown Task file (title as # heading)",
       alias: "f",
     },
+    issue: {
+      type: "string",
+      description:
+        "Path to a markdown issue file (title from H1, description from What to build)",
+      alias: "i",
+    },
     priority: {
       type: "string",
       description: "Task priority (default 0)",
@@ -52,25 +94,13 @@ export const dispatchCommand = defineCommand({
   },
   async run({ args }) {
     try {
-      if (!args.repo) {
-        throw new DispatchError(
-          'Repository name required. Usage: bridge dispatch <repo> --title "..." --description "..."'
-        );
-      }
+      const repoName = validateDispatchArgs(args);
 
-      const priority =
-        args.priority !== undefined ? Number(args.priority) : undefined;
-      if (priority !== undefined && Number.isNaN(priority)) {
-        throw new DispatchError("Priority must be a number.");
-      }
-
-      const contextDepth =
-        args["context-depth"] !== undefined
-          ? Number(args["context-depth"])
-          : undefined;
-      if (contextDepth !== undefined && Number.isNaN(contextDepth)) {
-        throw new DispatchError("Context depth must be a number.");
-      }
+      const priority = parseOptionalNumber(args.priority, "Priority");
+      const contextDepth = parseOptionalNumber(
+        args["context-depth"],
+        "Context depth"
+      );
 
       const { path } = resolveVaultConfig();
       await syncVaultBeforeCommand(path);
@@ -79,10 +109,11 @@ export const dispatchCommand = defineCommand({
       const result = await runDispatch({
         vaultPath: path,
         orders,
-        repoName: args.repo,
+        repoName,
         title: args.title,
         description: args.description,
         file: args.file,
+        issue: args.issue,
         priority,
         contextDepth,
         skipVerify: args["skip-verify"],

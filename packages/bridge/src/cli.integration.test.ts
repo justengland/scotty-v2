@@ -283,6 +283,80 @@ Implement the feature end to end.
   expect(logContent).toContain("Ship the feature");
 });
 
+test("bridge dispatch loads Task from --issue", async () => {
+  await setupDispatchFixtures();
+  const issueFile = join(tempRoot, "issue.md");
+  await writeFile(
+    issueFile,
+    `# Ship from issue markdown
+
+**Status:** ready-for-agent
+
+## What to build
+
+Source Tasks from local markdown issue files.
+`
+  );
+
+  await runCommand(bridgeCommand, {
+    rawArgs: ["dispatch", "alpha", "--issue", issueFile],
+  });
+
+  expect(process.exitCode).toBe(0);
+
+  const logDir = join(vaultPath, "log");
+  const logFiles = (await readdir(logDir)).filter((name) =>
+    name.endsWith(".md")
+  );
+  const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
+  expect(logContent).toContain("Ship from issue markdown");
+});
+
+test("bridge dispatch errors when --issue is combined with --title", async () => {
+  await setupDispatchFixtures();
+  const issueFile = join(tempRoot, "issue.md");
+  await writeFile(
+    issueFile,
+    `# Ship from issue
+
+## What to build
+
+Do the thing.
+`
+  );
+
+  await runCommand(bridgeCommand, {
+    rawArgs: [
+      "dispatch",
+      "alpha",
+      "--issue",
+      issueFile,
+      "--title",
+      "Inline title",
+    ],
+  });
+
+  const output = stdout.join("\n");
+  expect(output).toContain(
+    "--issue cannot be combined with --title, --description, or --file"
+  );
+  expect(output).not.toContain("mock-claude: executed");
+});
+
+test("bridge dispatch errors for malformed issue file", async () => {
+  await setupDispatchFixtures();
+  const issueFile = join(tempRoot, "bad-issue.md");
+  await writeFile(issueFile, "# Title only\n\nNo What to build section.\n");
+
+  await runCommand(bridgeCommand, {
+    rawArgs: ["dispatch", "alpha", "--issue", issueFile],
+  });
+
+  const output = stdout.join("\n");
+  expect(output).toContain('Issue file is missing a "What to build" section.');
+  expect(output).not.toContain("mock-claude: executed");
+});
+
 test("bridge dispatch sets Task priority from --priority", async () => {
   await setupDispatchFixtures();
 

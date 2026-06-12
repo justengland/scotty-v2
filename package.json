@@ -3,15 +3,25 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "test": "bun test packages/bridge",
     "build:bridge": "bun run --filter @scotty/bridge build",
     "typecheck": "bunx tsc --noEmit -p packages/bridge",
-    "prototype:discord-hail": "bun packages/bridge/prototype/discord-hail/run.ts"
+    "lint": "eslint packages/bridge/src",
+    "prototype:discord-hail": "bun packages/bridge/prototype/discord-hail/run.ts",
+    "prepare": "husky"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@eslint/js": "^10.0.1",
+    "@types/bun": "latest",
+    "eslint": "^10.5.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.7",
+    "prettier": "^3.8.4",
+    "typescript-eslint": "^8.61.0"
   },
   "peerDependencies": {
     "typescript": "^5"

@@ -74,7 +74,7 @@ export function createClaudeDiagnostic(deps: ClaudeDiagnosticDeps = {}): Diagnos
 
   return {
     id: "claude-code",
-    async updateArchive({ vaultPath, repoName, prompt }) {
+    async updateArchive({ vaultPath, repoName: _repoName, prompt }) {
       const claudePath = resolveClaudePath();
       if (!claudePath) {
         throw new ClaudeNotFoundError();

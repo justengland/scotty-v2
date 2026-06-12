@@ -30,6 +30,7 @@ beforeEach(async () => {
     HOME: process.env.HOME,
     PATH: process.env.PATH,
     SCOTTY_CLAUDE_PATH: process.env.SCOTTY_CLAUDE_PATH,
+    SCOTTY_TEST_REPO_PATH: process.env.SCOTTY_TEST_REPO_PATH,
     DISCORD_WEBHOOK_URL: process.env.DISCORD_WEBHOOK_URL,
   };
 
@@ -592,4 +593,141 @@ test("successful bridge dispatch does not hail", async () => {
 
   expect(process.exitCode).toBe(0);
   expect(payloads).toHaveLength(0);
+});
+
+async function setupDiagnosticFixtures(): Promise<void> {
+  await writeOrders();
+  await mkdir(repoPath, { recursive: true });
+  await Bun.$`git init -b main`.cwd(repoPath).quiet();
+  await Bun.$`git config user.email test@example.com`.cwd(repoPath).quiet();
+  await Bun.$`git config user.name Test`.cwd(repoPath).quiet();
+  await writeFile(join(repoPath, "README.md"), "# Alpha v1\n");
+  await Bun.$`git add -A`.cwd(repoPath).quiet();
+  await Bun.$`git commit -m ${"initial"}`.cwd(repoPath).quiet();
+  const initialSha = (
+    await Bun.$`git rev-parse HEAD`.cwd(repoPath).quiet()
+  ).stdout
+    .toString()
+    .trim();
+
+  await writeFile(join(repoPath, "README.md"), "# Alpha v2\n");
+  await Bun.$`git add -A`.cwd(repoPath).quiet();
+  await Bun.$`git commit -m ${"feature"}`.cwd(repoPath).quiet();
+
+  const archiveDir = join(vaultPath, "archive", "alpha");
+  await mkdir(archiveDir, { recursive: true });
+  const frontmatter = (sha: string) => `---
+entity: alpha-service
+repo: alpha
+updated: 2026-06-01
+sources: ["alpha@${sha}"]
+---
+`;
+  await writeFile(
+    join(archiveDir, "index.md"),
+    `${frontmatter(initialSha)}# Alpha index\n`,
+  );
+  await writeFile(
+    join(archiveDir, "captains-log.md"),
+    `${frontmatter(initialSha)}# Captain's Log\n`,
+  );
+
+  await Bun.$`git init -b main`.cwd(vaultPath).quiet();
+  await Bun.$`git config user.email test@example.com`.cwd(vaultPath).quiet();
+  await Bun.$`git config user.name Test`.cwd(vaultPath).quiet();
+  await Bun.$`git add -A`.cwd(vaultPath).quiet();
+  await Bun.$`git commit -m ${"seed vault"}`.cwd(vaultPath).quiet();
+
+  const bareRemote = join(tempRoot, "vault-remote.git");
+  await Bun.$`git init --bare -b main ${bareRemote}`.quiet();
+  await Bun.$`git remote add origin ${bareRemote}`.cwd(vaultPath).quiet();
+  await Bun.$`git push -u origin main`.cwd(vaultPath).quiet();
+
+  await installMockDiagnosticClaude();
+  process.env.SCOTTY_CLAUDE_PATH = join(mockBinDir, "claude");
+  process.env.SCOTTY_TEST_REPO_PATH = repoPath;
+}
+
+async function installMockDiagnosticClaude(): Promise<void> {
+  await mkdir(mockBinDir, { recursive: true });
+  const script = `#!/bin/sh
+HEAD=$(git -C "$SCOTTY_TEST_REPO_PATH" rev-parse HEAD)
+DATE=2026-06-12
+write_page() {
+  cat > "$1" <<EOF
+---
+entity: alpha-service
+repo: alpha
+updated: $DATE
+sources: ["alpha@$HEAD"]
+---
+$2
+EOF
+}
+write_page "archive/alpha/index.md" "# Alpha index
+
+Updated by diagnostic mock.
+"
+echo "mock-diagnostic: archive updated"
+exit 0
+`;
+  const scriptPath = join(mockBinDir, "claude");
+  await writeFile(scriptPath, script);
+  await chmod(scriptPath, 0o755);
+}
+
+test("bridge diagnostic updates archive, commits, and pushes vault", async () => {
+  await setupDiagnosticFixtures();
+
+  await runCommand(bridgeCommand, { rawArgs: ["diagnostic", "alpha"] });
+
+  expect(process.exitCode).toBe(0);
+
+  const indexContent = await Bun.file(
+    join(vaultPath, "archive", "alpha", "index.md"),
+  ).text();
+  expect(indexContent).toContain("Updated by diagnostic mock");
+
+  const captainsLog = await Bun.file(
+    join(vaultPath, "archive", "alpha", "captains-log.md"),
+  ).text();
+  expect(captainsLog).toContain("mock-diagnostic: archive updated");
+
+  const bareRemote = join(tempRoot, "vault-remote.git");
+  const remoteLog = await Bun.$`git log --oneline`.cwd(bareRemote).quiet();
+  expect(remoteLog.stdout.toString()).toContain("diagnostic: alpha");
+});
+
+test("bridge diagnostic hails and exits non-zero on validation failure", async () => {
+  await setupDiagnosticFixtures();
+  const { payloads } = installMockDiscordWebhook();
+  await writeFile(
+    join(mockBinDir, "claude"),
+    `#!/bin/sh
+cat > archive/alpha/index.md <<EOF
+# Missing frontmatter
+EOF
+echo "mock-diagnostic: invalid output"
+exit 0
+`,
+  );
+  await chmod(join(mockBinDir, "claude"), 0o755);
+
+  await runCommand(bridgeCommand, { rawArgs: ["diagnostic", "alpha"] });
+
+  expect(process.exitCode).toBe(1);
+  expect(payloads).toHaveLength(1);
+  const hailBody = JSON.parse(payloads[0]!);
+  expect(hailBody.content).toContain("alpha");
+  expect(hailBody.content).toContain("Diagnostic failure");
+});
+
+test("bridge diagnostic errors when repo is missing from roster", async () => {
+  await setupDiagnosticFixtures();
+
+  await runCommand(bridgeCommand, { rawArgs: ["diagnostic", "missing"] });
+
+  const output = stdout.join("\n");
+  expect(output).toContain('Repository "missing" is not on the Duty Roster');
+  expect(process.exitCode).toBe(1);
 });

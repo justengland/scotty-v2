@@ -41,12 +41,6 @@ for (const { name, command, term } of COMMAND_HELP_CASES) {
   });
 }
 
-for (const name of ["diagnostic"] as const) {
-  test(`stub ${name} command completes without error`, async () => {
-    await runCommand(bridgeCommand, { rawArgs: [name] });
-  });
-}
-
 test("bridge hail completes when DISCORD_WEBHOOK_URL is configured", async () => {
   const originalWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
   const originalFetch = globalThis.fetch;

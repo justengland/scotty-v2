@@ -1,4 +1,13 @@
 import { defineCommand } from "citty";
+import { createClaudeTeam } from "../../away-team/claude-team";
+import { DispatchError } from "../../dispatch/errors";
+import { runDispatch } from "../../dispatch/run-dispatch";
+import {
+  loadResolvedMissionOrders,
+  resolveVaultConfig,
+  VaultConfigError,
+} from "../../vault/resolve-vault-config";
+import { syncVaultBeforeCommand } from "../../vault/vault-client";
 
 export const dispatchCommand = defineCommand({
   meta: {
@@ -12,8 +21,67 @@ export const dispatchCommand = defineCommand({
       description: "Repository name from the Duty Roster",
       required: false,
     },
+    title: {
+      type: "string",
+      description: "Task title",
+      alias: "t",
+    },
+    description: {
+      type: "string",
+      description: "Task description",
+      alias: "d",
+    },
+    file: {
+      type: "string",
+      description: "Path to a markdown Task file (title as # heading)",
+      alias: "f",
+    },
+    priority: {
+      type: "string",
+      description: "Task priority (default 0)",
+      alias: "p",
+    },
   },
-  async run() {
-    console.log("dispatch: not yet implemented");
+  async run({ args }) {
+    try {
+      if (!args.repo) {
+        throw new DispatchError(
+          "Repository name required. Usage: bridge dispatch <repo> --title \"...\" --description \"...\"",
+        );
+      }
+
+      const priority =
+        args.priority !== undefined ? Number(args.priority) : undefined;
+      if (priority !== undefined && Number.isNaN(priority)) {
+        throw new DispatchError("Priority must be a number.");
+      }
+
+      const { path } = resolveVaultConfig();
+      await syncVaultBeforeCommand(path);
+      const orders = loadResolvedMissionOrders();
+      const awayTeam = createClaudeTeam();
+
+      const result = await runDispatch({
+        vaultPath: path,
+        orders,
+        repoName: args.repo,
+        title: args.title,
+        description: args.description,
+        file: args.file,
+        priority,
+        awayTeam,
+      });
+
+      if (result.exitCode !== 0) {
+        process.exitCode = result.exitCode;
+      }
+    } catch (error) {
+      if (error instanceof VaultConfigError || error instanceof DispatchError) {
+        console.error(error.message);
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   },
 });

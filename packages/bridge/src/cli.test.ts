@@ -41,12 +41,8 @@ for (const { name, command, term } of COMMAND_HELP_CASES) {
   });
 }
 
-for (const name of ["dispatch", "diagnostic", "hail"] as const) {
+for (const name of ["diagnostic", "hail"] as const) {
   test(`stub ${name} command completes without error`, async () => {
     await runCommand(bridgeCommand, { rawArgs: [name] });
   });
 }
-
-test("stub dispatch with repo argument completes without error", async () => {
-  await runCommand(bridgeCommand, { rawArgs: ["dispatch", "starbase-api"] });
-});

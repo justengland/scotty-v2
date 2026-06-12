@@ -23,15 +23,15 @@ Operator-visible dispatch context behavior unchanged: default pages, Mission Ord
 
 ## Acceptance criteria
 
-- [ ] Archive module exposes `buildPageIndex`, `resolveWikiLink`, and `traverseContextPaths`
-- [ ] Context injection on dispatch uses Archive module; duplicate walker removed
-- [ ] Depth `0` behavior identical to current Phase 1 / Phase 2 default
-- [ ] `contextDepth` > 0 traverses wiki-links with cycle safety and deduplication
-- [ ] Broken `[[wiki-links]]` abort dispatch before Away Team with clear error naming the target
-- [ ] All paths returned are vault-relative (e.g. `archive/alpha/index.md`)
-- [ ] Archive module test suite covers index, traversal, broken links, and cycles
-- [ ] CursorTeam dispatch path still receives correct `Task.contextFiles`
-- [ ] All existing `packages/bridge` tests pass
+- [x] Archive module exposes `buildPageIndex`, `resolveWikiLink`, and `traverseContextPaths`
+- [x] Context injection on dispatch uses Archive module; duplicate walker removed
+- [x] Depth `0` behavior identical to current Phase 1 / Phase 2 default
+- [x] `contextDepth` > 0 traverses wiki-links with cycle safety and deduplication
+- [x] Broken `[[wiki-links]]` abort dispatch before Away Team with clear error naming the target
+- [x] All paths returned are vault-relative (e.g. `archive/alpha/index.md`)
+- [x] Archive module test suite covers index, traversal, broken links, and cycles
+- [x] CursorTeam dispatch path still receives correct `Task.contextFiles`
+- [x] All existing `packages/bridge` tests pass
 
 ## Blocked by
 

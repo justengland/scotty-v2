@@ -30,77 +30,23 @@ afterEach(async () => {
   await rm(tempRoot, { recursive: true, force: true });
 });
 
-test("depth 0 loads only initial context paths", async () => {
-  const paths = resolveContextPaths(repo);
-  const files = await loadContextFiles(vaultPath, paths, {
-    repo,
-    contextDepth: 0,
-  });
-
-  expect(files.map((file) => file.path)).toEqual([
+test("resolveContextPaths includes defaults and mission order extras", () => {
+  expect(resolveContextPaths(repo)).toEqual([
     "archive/alpha/index.md",
     "archive/alpha/captains-log.md",
   ]);
+  expect(resolveContextPaths(repo, ["runbook.md"])).toEqual([
+    "archive/alpha/index.md",
+    "archive/alpha/captains-log.md",
+    "archive/alpha/runbook.md",
+  ]);
 });
 
-test("depth 1 adds linked archive pages to context", async () => {
+test("loadContextFiles delegates to archive traversal", async () => {
   const paths = resolveContextPaths(repo);
   const files = await loadContextFiles(vaultPath, paths, {
     repo,
     contextDepth: 1,
-  });
-
-  expect(files.map((file) => file.path)).toEqual([
-    "archive/alpha/index.md",
-    "archive/alpha/captains-log.md",
-    "archive/alpha/architecture.md",
-  ]);
-});
-
-test("depth 2 follows links from traversed pages", async () => {
-  const paths = resolveContextPaths(repo);
-  const files = await loadContextFiles(vaultPath, paths, {
-    repo,
-    contextDepth: 2,
-  });
-
-  expect(files.map((file) => file.path)).toEqual([
-    "archive/alpha/index.md",
-    "archive/alpha/captains-log.md",
-    "archive/alpha/architecture.md",
-    "archive/alpha/decision.md",
-  ]);
-});
-
-test("broken wiki-link aborts with clear error naming target", async () => {
-  const archiveDir = join(vaultPath, "archive", repo);
-  await writeFile(
-    join(archiveDir, "index.md"),
-    "# Alpha\n\nSee [[Missing Page]].\n"
-  );
-
-  const paths = resolveContextPaths(repo);
-
-  await expect(
-    loadContextFiles(vaultPath, paths, { repo, contextDepth: 1 })
-  ).rejects.toThrow("broken wiki-link to [[Missing Page]]");
-});
-
-test("cycle-safe traversal does not infinite-loop", async () => {
-  const archiveDir = join(vaultPath, "archive", repo);
-  await writeFile(
-    join(archiveDir, "index.md"),
-    "# Alpha\n\nSee [[architecture]].\n"
-  );
-  await writeFile(
-    join(archiveDir, "architecture.md"),
-    "# Architecture\n\nBack to [[index]].\n"
-  );
-
-  const paths = resolveContextPaths(repo);
-  const files = await loadContextFiles(vaultPath, paths, {
-    repo,
-    contextDepth: 3,
   });
 
   expect(files.map((file) => file.path)).toEqual([

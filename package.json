@@ -1,0 +1,21 @@
+{
+  "name": "scotty-v2",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "test": "bun test packages/bridge",
+    "typecheck": "bunx tsc --noEmit -p packages/bridge",
+    "prototype:discord-hail": "bun packages/bridge/prototype/discord-hail/run.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "skills": "^1.5.11"
+  }
+}

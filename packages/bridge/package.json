@@ -12,6 +12,7 @@
     "build": "bun build --compile --minify --target=bun src/index.ts --outfile dist/bridge"
   },
   "dependencies": {
+    "@cursor/sdk": "^1.0.18",
     "citty": "^0.2.2"
   }
 }

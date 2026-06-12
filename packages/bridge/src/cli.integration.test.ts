@@ -31,6 +31,7 @@ beforeEach(async () => {
     PATH: process.env.PATH,
     SCOTTY_CLAUDE_PATH: process.env.SCOTTY_CLAUDE_PATH,
     SCOTTY_TEST_REPO_PATH: process.env.SCOTTY_TEST_REPO_PATH,
+    CURSOR_API_KEY: process.env.CURSOR_API_KEY,
     DISCORD_WEBHOOK_URL: process.env.DISCORD_WEBHOOK_URL,
   };
 
@@ -70,7 +71,10 @@ afterEach(async () => {
   await rm(tempRoot, { recursive: true, force: true });
 });
 
-async function writeOrders(repoLocalPath = repoPath): Promise<void> {
+async function writeOrders(
+  repoLocalPath = repoPath,
+  agent = "claude-code"
+): Promise<void> {
   await mkdir(join(vaultPath, "orders"), { recursive: true });
   await writeFile(
     join(vaultPath, "orders", "mission-orders.toml"),
@@ -78,7 +82,7 @@ async function writeOrders(repoLocalPath = repoPath): Promise<void> {
 remote = "git@github.com:example/scotty-vault.git"
 
 [repos.alpha]
-agent = "claude-code"
+agent = "${agent}"
 verify = "bun"
 context = ["architecture.md"]
 
@@ -131,8 +135,8 @@ function installMockDiscordWebhook(): { payloads: string[] } {
   return { payloads };
 }
 
-async function setupDispatchFixtures(): Promise<void> {
-  await writeOrders();
+async function setupDispatchFixtures(agent = "claude-code"): Promise<void> {
+  await writeOrders(repoPath, agent);
   await writeArchiveContext();
   await mkdir(repoPath, { recursive: true });
   await writeFile(
@@ -342,6 +346,25 @@ test("bridge dispatch errors when claude is not on PATH", async () => {
   const output = stdout.join("\n");
   expect(output).toContain("claude is not on PATH");
   expect(output).not.toContain("mock-claude: executed");
+});
+
+test("bridge dispatch errors when CURSOR_API_KEY is missing for cursor agent", async () => {
+  await setupDispatchFixtures("cursor");
+  delete process.env.CURSOR_API_KEY;
+
+  await runCommand(bridgeCommand, {
+    rawArgs: [
+      "dispatch",
+      "alpha",
+      "--title",
+      "No cursor key",
+      "--description",
+      "Should fail fast.",
+    ],
+  });
+
+  const output = stdout.join("\n");
+  expect(output).toContain("CURSOR_API_KEY is not set");
 });
 
 test("bridge dispatch fails when Tricorder fails and logs verification", async () => {

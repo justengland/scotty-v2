@@ -1,13 +1,14 @@
 import type { MissionOrders } from "../mission-orders/types";
-import {
-  createHailChannels,
-  sendFailureHail,
-} from "../hailing/send-hail";
+import { createHailChannels, sendFailureHail } from "../hailing/send-hail";
 import type { HailChannel } from "../hailing/types";
 import { resolveVerifier } from "../tricorder/registry";
 import type { VerificationResult } from "../tricorder/types";
 import { VaultConfigError } from "../vault/resolve-vault-config";
 import { commitVaultLocally } from "../vault/commit-vault";
+import {
+  resolveAwayTeam,
+  type AwayTeamRegistryDeps,
+} from "../away-team/registry";
 import type { AwayTeam } from "./types";
 import { buildTask } from "./build-task";
 import { DispatchError } from "./errors";
@@ -22,7 +23,8 @@ export interface DispatchInput {
   file?: string;
   priority?: number;
   skipVerify?: boolean;
-  awayTeam: AwayTeam;
+  awayTeam?: AwayTeam;
+  awayTeamDeps?: AwayTeamRegistryDeps;
   hailChannels?: HailChannel[];
 }
 
@@ -32,7 +34,11 @@ export interface DispatchResult {
   logPath?: string;
 }
 
-function summarizeExecution(stdout: string, stderr: string, success: boolean): string {
+function summarizeExecution(
+  stdout: string,
+  stderr: string,
+  success: boolean
+): string {
   const combined = [stdout.trim(), stderr.trim()].filter(Boolean).join(" ");
   if (combined) {
     const firstLine = combined.split(/\r?\n/)[0] ?? combined;
@@ -41,25 +47,24 @@ function summarizeExecution(stdout: string, stderr: string, success: boolean): s
   return success ? "Away Team completed." : "Away Team failed.";
 }
 
-export async function runDispatch(input: DispatchInput): Promise<DispatchResult> {
+export async function runDispatch(
+  input: DispatchInput
+): Promise<DispatchResult> {
   const profile = input.orders.repos[input.repoName];
   if (!profile) {
     throw new VaultConfigError(
-      `Repository "${input.repoName}" is not on the Duty Roster. Check Mission Orders for available repos.`,
+      `Repository "${input.repoName}" is not on the Duty Roster. Check Mission Orders for available repos.`
     );
   }
 
   if (!profile.path) {
     throw new DispatchError(
-      `Repository "${input.repoName}" has no local path in Mission Orders.`,
+      `Repository "${input.repoName}" has no local path in Mission Orders.`
     );
   }
 
-  if (profile.agent !== "claude-code") {
-    throw new DispatchError(
-      `Away Team "${profile.agent}" is not supported in Phase 1. Use agent = "claude-code".`,
-    );
-  }
+  const awayTeam =
+    input.awayTeam ?? resolveAwayTeam(profile.agent, input.awayTeamDeps);
 
   const task = await buildTask({
     repo: input.repoName,
@@ -71,7 +76,7 @@ export async function runDispatch(input: DispatchInput): Promise<DispatchResult>
     priority: input.priority,
   });
 
-  const result = await input.awayTeam.execute(task, profile.path);
+  const result = await awayTeam.execute(task, profile.path);
 
   let verification: VerificationResult | undefined;
   if (profile.verify && !input.skipVerify) {
@@ -79,9 +84,7 @@ export async function runDispatch(input: DispatchInput): Promise<DispatchResult>
     verification = await verifier.verify(profile.path);
   }
 
-  const dispatchSucceeded = verification
-    ? verification.passed
-    : result.success;
+  const dispatchSucceeded = verification ? verification.passed : result.success;
 
   const summary = verification
     ? verification.summary
@@ -97,7 +100,7 @@ export async function runDispatch(input: DispatchInput): Promise<DispatchResult>
 
   await commitVaultLocally(
     input.vaultPath,
-    `dispatch: ${input.repoName} — ${task.title}`,
+    `dispatch: ${input.repoName} — ${task.title}`
   );
 
   if (!dispatchSucceeded) {

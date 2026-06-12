@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { resetHailWarningsForTests } from "../hailing/send-hail";
 import type { HailChannel } from "../hailing/types";
+import { createCursorTeam } from "../away-team/cursor-team";
 import { runDispatch } from "./run-dispatch";
 import type { AwayTeam, ExecutionResult } from "./types";
 
@@ -34,7 +35,7 @@ beforeEach(async () => {
   await writeFile(join(vaultPath, "archive", "alpha", "index.md"), "# Alpha\n");
   await writeFile(
     join(vaultPath, "archive", "alpha", "captains-log.md"),
-    "# Log\n",
+    "# Log\n"
   );
   await Bun.$`git init`.cwd(vaultPath).quiet();
   await Bun.$`git config user.email test@example.com`.cwd(vaultPath).quiet();
@@ -318,4 +319,76 @@ test("runDispatch does not hail when Tricorder passes despite Away Team failure"
 
   expect(result.exitCode).toBe(0);
   expect(hail.messages).toHaveLength(0);
+});
+
+test("runDispatch routes cursor agent through CursorTeam with mocked SDK", async () => {
+  const repoPath = join(tempRoot, "cursor-repo");
+  await mkdir(repoPath, { recursive: true });
+  let capturedPrompt: string | undefined;
+
+  const cursorTeam = createCursorTeam({
+    env: {
+      CURSOR_API_KEY: "cursor_test_key",
+      SCOTTY_CURSOR_MODEL: "composer-2.5",
+      SCOTTY_CURSOR_STREAM_LOG: "0",
+    },
+    createAgent: async () => ({
+      agentId: "agent-1",
+      model: undefined,
+      async send(message: string) {
+        capturedPrompt = message;
+        return {
+          id: "run-1",
+          agentId: "agent-1",
+          supports: () => true,
+          unsupportedReason: () => undefined,
+          async *stream() {},
+          conversation: async () => [],
+          wait: async () => ({
+            id: "run-1",
+            status: "finished" as const,
+            result: "cursor ok",
+            durationMs: 12,
+          }),
+          cancel: async () => {},
+          status: "finished" as const,
+          onDidChangeStatus: () => () => {},
+        };
+      },
+      close: () => {},
+      reload: async () => {},
+      [Symbol.asyncDispose]: async () => {},
+      listArtifacts: async () => [],
+      downloadArtifact: async () => Buffer.from(""),
+    }),
+  });
+
+  const result = await runDispatch({
+    vaultPath,
+    orders: {
+      vault: {},
+      repos: {
+        alpha: {
+          path: repoPath,
+          agent: "cursor",
+        },
+      },
+    },
+    repoName: "alpha",
+    title: "Cursor dispatch",
+    description: "Run via CursorTeam.",
+    awayTeam: cursorTeam,
+    hailChannels: [],
+  });
+
+  expect(result.exitCode).toBe(0);
+  expect(capturedPrompt).toContain("# Task: Cursor dispatch");
+  expect(capturedPrompt).toContain("Run via CursorTeam.");
+  expect(capturedPrompt).toContain("## Starfleet Archive context");
+
+  const logDir = join(vaultPath, "log");
+  const logFiles = await readdir(logDir);
+  const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
+  expect(logContent).toContain("dispatch: alpha");
+  expect(logContent).toContain("Cursor dispatch");
 });

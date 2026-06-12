@@ -1,5 +1,4 @@
 import { defineCommand } from "citty";
-import { createClaudeTeam } from "../../away-team/claude-team";
 import { DispatchError } from "../../dispatch/errors";
 import { runDispatch } from "../../dispatch/run-dispatch";
 import {
@@ -50,7 +49,7 @@ export const dispatchCommand = defineCommand({
     try {
       if (!args.repo) {
         throw new DispatchError(
-          "Repository name required. Usage: bridge dispatch <repo> --title \"...\" --description \"...\"",
+          'Repository name required. Usage: bridge dispatch <repo> --title "..." --description "..."'
         );
       }
 
@@ -63,7 +62,6 @@ export const dispatchCommand = defineCommand({
       const { path } = resolveVaultConfig();
       await syncVaultBeforeCommand(path);
       const orders = loadResolvedMissionOrders();
-      const awayTeam = createClaudeTeam();
 
       const result = await runDispatch({
         vaultPath: path,
@@ -74,7 +72,6 @@ export const dispatchCommand = defineCommand({
         file: args.file,
         priority,
         skipVerify: args["skip-verify"],
-        awayTeam,
       });
 
       if (result.exitCode !== 0) {

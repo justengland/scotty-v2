@@ -1,23 +1,7 @@
 import type { Task } from "../dispatch/types";
 import { existsSync } from "node:fs";
 import { ClaudeNotFoundError } from "../dispatch/errors";
-
-function buildPrompt(task: Task): string {
-  const sections = [
-    `# Task: ${task.title}`,
-    "",
-    task.description,
-    "",
-    "## Starfleet Archive context",
-    "",
-  ];
-
-  for (const file of task.contextFiles) {
-    sections.push(`### ${file.path}`, "", file.content, "");
-  }
-
-  return sections.join("\n").trim();
-}
+import { buildTaskPrompt } from "./build-prompt";
 
 export interface ClaudeTeamDeps {
   resolveClaudePath?: () => string | undefined;
@@ -32,8 +16,7 @@ function defaultResolveClaudePath(): string | undefined {
 }
 
 export function createClaudeTeam(deps: ClaudeTeamDeps = {}) {
-  const resolveClaudePath =
-    deps.resolveClaudePath ?? defaultResolveClaudePath;
+  const resolveClaudePath = deps.resolveClaudePath ?? defaultResolveClaudePath;
 
   return {
     id: "claude-code",
@@ -43,7 +26,7 @@ export function createClaudeTeam(deps: ClaudeTeamDeps = {}) {
         throw new ClaudeNotFoundError();
       }
 
-      const prompt = buildPrompt(task);
+      const prompt = buildTaskPrompt(task);
       const startedAt = Date.now();
 
       const proc = Bun.spawn([claudePath, "-p", prompt], {

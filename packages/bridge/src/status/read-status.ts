@@ -1,6 +1,4 @@
-import { readdir } from "node:fs/promises";
-import { join } from "node:path";
-import { parseFrontmatter } from "../diagnostic/parse-frontmatter";
+import { readLatestArchiveStardate } from "../archive/archive";
 import { readLastRecordedSha } from "../diagnostic/read-last-sha";
 import { readEngineeringLog } from "../log/read-log";
 
@@ -10,35 +8,6 @@ export interface RepoStatus {
   lastDispatchDate?: string;
   lastSourcesSha?: string;
   lastDiagnosticStardate?: string;
-}
-
-async function readLastDiagnosticStardate(
-  vaultPath: string,
-  repoName: string
-): Promise<string | undefined> {
-  const archiveDir = join(vaultPath, "archive", repoName);
-
-  let entries: string[];
-  try {
-    entries = await readdir(archiveDir);
-  } catch {
-    return undefined;
-  }
-
-  let latest: string | undefined;
-
-  for (const entry of entries) {
-    if (!entry.endsWith(".md")) continue;
-
-    const content = await Bun.file(join(archiveDir, entry)).text();
-    const { frontmatter } = parseFrontmatter(content);
-    if (!frontmatter.updated) continue;
-    if (!latest || frontmatter.updated > latest) {
-      latest = frontmatter.updated;
-    }
-  }
-
-  return latest;
 }
 
 export async function readFleetStatus(
@@ -54,7 +23,7 @@ export async function readFleetStatus(
       limit: 1,
     });
     const lastSourcesSha = await readLastRecordedSha(vaultPath, repo);
-    const lastDiagnosticStardate = await readLastDiagnosticStardate(
+    const lastDiagnosticStardate = await readLatestArchiveStardate(
       vaultPath,
       repo
     );

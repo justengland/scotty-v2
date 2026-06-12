@@ -2,10 +2,13 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { formatFrontmatter } from "../diagnostic/parse-frontmatter";
 import {
   buildPageIndex,
+  readLatestArchiveStardate,
   resolveWikiLink,
   traverseContextPaths,
+  validateArchivePages,
 } from "./archive";
 
 let tempRoot: string;
@@ -144,4 +147,114 @@ test("missing seed file aborts with clear error", async () => {
   ).rejects.toThrow(
     "Context file missing: archive/alpha/missing.md. Add it to the Starfleet Archive before dispatch."
   );
+});
+
+function archivePage(sha: string, body = "# Alpha index\n"): string {
+  return `${formatFrontmatter({
+    entity: "alpha-service",
+    repo: "alpha",
+    updated: "2026-06-01",
+    sources: [`alpha@${sha}`],
+  })}
+${body}`;
+}
+
+test("validateArchivePages rejects missing frontmatter and stale sources", async () => {
+  const archiveDir = join(vaultPath, "archive", repo);
+  await writeFile(join(archiveDir, "index.md"), archivePage("abc123"));
+  await writeFile(
+    join(archiveDir, "captains-log.md"),
+    archivePage("abc123", "# Captain's Log\n")
+  );
+  await writeFile(join(archiveDir, "broken.md"), "# Missing frontmatter\n");
+
+  const errors = await validateArchivePages({
+    vaultPath,
+    repoName: repo,
+    repoHeadSha: "def456",
+  });
+
+  expect(
+    errors.some((error) =>
+      error.includes(
+        'archive/alpha/broken.md: missing frontmatter field "entity"'
+      )
+    )
+  ).toBe(true);
+  expect(errors.some((error) => error.includes("stale sources"))).toBe(true);
+});
+
+test("validateArchivePages rejects broken wiki-links", async () => {
+  const archiveDir = join(vaultPath, "archive", repo);
+  await writeFile(
+    join(archiveDir, "index.md"),
+    archivePage("abc123", "# Alpha\n\nSee [[Missing Page]].\n")
+  );
+  await writeFile(
+    join(archiveDir, "captains-log.md"),
+    archivePage("abc123", "# Captain's Log\n")
+  );
+
+  const errors = await validateArchivePages({
+    vaultPath,
+    repoName: repo,
+    repoHeadSha: "abc123",
+  });
+
+  expect(errors.some((error) => error.includes("broken wiki-link"))).toBe(true);
+});
+
+test("repo-scoped wiki-links valid at dispatch are valid at diagnostic", async () => {
+  const archiveDir = join(vaultPath, "archive", repo);
+  await writeFile(
+    join(archiveDir, "index.md"),
+    archivePage("abc123", "# Alpha\n\nSee [[architecture]].\n")
+  );
+  await writeFile(
+    join(archiveDir, "captains-log.md"),
+    archivePage("abc123", "# Captain's Log\n")
+  );
+
+  const seeds = ["archive/alpha/index.md", "archive/alpha/captains-log.md"];
+  await traverseContextPaths(vaultPath, seeds, { repo, contextDepth: 1 });
+
+  const errors = await validateArchivePages({
+    vaultPath,
+    repoName: repo,
+    repoHeadSha: "abc123",
+  });
+
+  expect(errors.filter((error) => error.includes("broken wiki-link"))).toEqual(
+    []
+  );
+});
+
+test("readLatestArchiveStardate returns latest updated date across pages", async () => {
+  const archiveDir = join(vaultPath, "archive", repo);
+  await writeFile(
+    join(archiveDir, "index.md"),
+    `${formatFrontmatter({
+      entity: "alpha-service",
+      repo: "alpha",
+      updated: "2026-06-10",
+      sources: ["alpha@abc123"],
+    })}
+# Alpha index
+`
+  );
+  await writeFile(
+    join(archiveDir, "captains-log.md"),
+    `${formatFrontmatter({
+      entity: "alpha-service",
+      repo: "alpha",
+      updated: "2026-06-12",
+      sources: ["alpha@abc123"],
+    })}
+# Captain's Log
+`
+  );
+
+  const stardate = await readLatestArchiveStardate(vaultPath, repo);
+
+  expect(stardate).toBe("2026-06-12");
 });

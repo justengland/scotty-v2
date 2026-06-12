@@ -22,13 +22,13 @@ Dispatch context injection and diagnostic validation must agree on wiki-link res
 
 ## Acceptance criteria
 
-- [ ] `validateArchivePages` uses shared `buildPageIndex`; duplicate walker removed from archive validation
-- [ ] Diagnostic Cycle still blocks vault commit on frontmatter errors, stale sources, and broken wiki-links
-- [ ] Validation error messages use vault-relative paths where paths appear
-- [ ] `bridge status` reads Archive stardate via Archive module, not diagnostic imports
-- [ ] A page reachable at dispatch context time is not falsely flagged broken at diagnostic time
-- [ ] Archive module tests cover frontmatter validation and stale `sources` scenarios
-- [ ] All existing `packages/bridge` tests pass
+- [x] `validateArchivePages` uses shared `buildPageIndex`; duplicate walker removed from archive validation
+- [x] Diagnostic Cycle still blocks vault commit on frontmatter errors, stale sources, and broken wiki-links
+- [x] Validation error messages use vault-relative paths where paths appear
+- [x] `bridge status` reads Archive stardate via Archive module, not diagnostic imports
+- [x] A page reachable at dispatch context time is not falsely flagged broken at diagnostic time
+- [x] Archive module tests cover frontmatter validation and stale `sources` scenarios
+- [x] All existing `packages/bridge` tests pass
 
 ## Blocked by
 

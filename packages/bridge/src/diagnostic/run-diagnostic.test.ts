@@ -9,7 +9,6 @@ import { formatFrontmatter } from "./parse-frontmatter";
 import { readLastRecordedSha } from "./read-last-sha";
 import { diffRepoSince } from "./repo-diff";
 import { runDiagnostic } from "./run-diagnostic";
-import { validateArchivePages } from "./validate-archive";
 
 let tempRoot: string;
 let vaultPath: string;
@@ -178,41 +177,6 @@ test("runDiagnostic appends Captain's Log, validates, commits, and pushes vault"
   expect(captainsLog).toContain("## 2026-06-12");
   expect(captainsLog).toContain("mock-diagnostic: archive updated");
   expect(captainsLog).toContain(`alpha@${headSha}`);
-});
-
-test("validateArchivePages rejects missing frontmatter and stale sources", async () => {
-  await setupVault(initialSha);
-  await writeFile(
-    join(vaultPath, "archive", "alpha", "broken.md"),
-    "# Missing frontmatter\n"
-  );
-
-  const errors = await validateArchivePages({
-    vaultPath,
-    repoName: "alpha",
-    repoHeadSha: headSha,
-  });
-
-  expect(
-    errors.some((error) => error.includes('missing frontmatter field "entity"'))
-  ).toBe(true);
-  expect(errors.some((error) => error.includes("stale sources"))).toBe(true);
-});
-
-test("validateArchivePages rejects broken wiki-links", async () => {
-  await setupVault(headSha);
-  await writeFile(
-    join(vaultPath, "archive", "alpha", "index.md"),
-    `${archivePage(headSha, "# Alpha\n\nSee [[Missing Page]].\n")}`
-  );
-
-  const errors = await validateArchivePages({
-    vaultPath,
-    repoName: "alpha",
-    repoHeadSha: headSha,
-  });
-
-  expect(errors.some((error) => error.includes("broken wiki-link"))).toBe(true);
 });
 
 test("runDiagnostic hails and exits non-zero when validation fails", async () => {

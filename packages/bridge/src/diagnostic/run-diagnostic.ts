@@ -8,7 +8,7 @@ import { DiagnosticError } from "./errors";
 import { diffRepoSince, resolveRepoHeadSha } from "./repo-diff";
 import { readLastRecordedSha } from "./read-last-sha";
 import { commitAndPushVault } from "./push-vault";
-import { validateArchivePages } from "./validate-archive";
+import { validateArchivePages } from "../archive/archive";
 
 export interface RunDiagnosticInput {
   vaultPath: string;

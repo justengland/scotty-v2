@@ -2,7 +2,9 @@ import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DispatchError } from "../dispatch/errors";
+import { parseFrontmatter } from "../diagnostic/parse-frontmatter";
 
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const WIKI_LINK_PATTERN = /\[\[([^\]|#]+)(?:#[^\]|]+)?\]\]/g;
 
 export type PageIndex = Map<string, string>;
@@ -153,4 +155,95 @@ export async function traverseContextPaths(
   }
 
   return files;
+}
+
+export async function validateArchivePages(params: {
+  vaultPath: string;
+  repoName: string;
+  repoHeadSha: string;
+}): Promise<string[]> {
+  const archiveDir = join(params.vaultPath, "archive", params.repoName);
+  const errors: string[] = [];
+
+  let entries: string[];
+  try {
+    entries = await readdir(archiveDir);
+  } catch {
+    return [`Archive directory missing: archive/${params.repoName}/`];
+  }
+
+  const markdownFiles = entries.filter((entry) => entry.endsWith(".md"));
+
+  if (markdownFiles.length === 0) {
+    errors.push(`No Archive pages under archive/${params.repoName}/`);
+  }
+
+  const pageIndex = await buildPageIndex(params.vaultPath);
+  const expectedSource = `${params.repoName}@${params.repoHeadSha}`;
+
+  for (const entry of markdownFiles) {
+    const relativePath = `archive/${params.repoName}/${entry}`;
+    const content = await readFile(join(archiveDir, entry), "utf8");
+    const { frontmatter } = parseFrontmatter(content);
+
+    if (!frontmatter.entity) {
+      errors.push(`${relativePath}: missing frontmatter field "entity"`);
+    }
+    if (!frontmatter.repo) {
+      errors.push(`${relativePath}: missing frontmatter field "repo"`);
+    }
+    if (!frontmatter.updated || !ISO_DATE_PATTERN.test(frontmatter.updated)) {
+      errors.push(
+        `${relativePath}: missing or invalid frontmatter field "updated"`
+      );
+    }
+    if (!frontmatter.sources || frontmatter.sources.length === 0) {
+      errors.push(`${relativePath}: missing frontmatter field "sources"`);
+    } else if (!frontmatter.sources.includes(expectedSource)) {
+      errors.push(
+        `${relativePath}: stale sources (expected ${expectedSource}, got ${frontmatter.sources.join(", ")})`
+      );
+    }
+
+    for (const target of extractWikiLinks(content)) {
+      const resolved = resolveWikiLink(target, {
+        repo: params.repoName,
+        index: pageIndex,
+      });
+      if (!resolved) {
+        errors.push(`${relativePath}: broken wiki-link to [[${target}]]`);
+      }
+    }
+  }
+
+  return errors;
+}
+
+export async function readLatestArchiveStardate(
+  vaultPath: string,
+  repoName: string
+): Promise<string | undefined> {
+  const archiveDir = join(vaultPath, "archive", repoName);
+
+  let entries: string[];
+  try {
+    entries = await readdir(archiveDir);
+  } catch {
+    return undefined;
+  }
+
+  let latest: string | undefined;
+
+  for (const entry of entries) {
+    if (!entry.endsWith(".md")) continue;
+
+    const content = await readFile(join(archiveDir, entry), "utf8");
+    const { frontmatter } = parseFrontmatter(content);
+    if (!frontmatter.updated) continue;
+    if (!latest || frontmatter.updated > latest) {
+      latest = frontmatter.updated;
+    }
+  }
+
+  return latest;
 }

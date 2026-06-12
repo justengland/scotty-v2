@@ -402,6 +402,62 @@ test("bridge dispatch aborts when context file is missing", async () => {
   expect(output).not.toContain("mock-claude: executed");
 });
 
+test("bridge dispatch --context-depth traverses wiki-linked Archive pages", async () => {
+  await setupDispatchFixtures();
+  await writeFile(
+    join(vaultPath, "archive", "alpha", "index.md"),
+    "# Alpha index\n\nSee [[architecture]].\n"
+  );
+
+  await runCommand(bridgeCommand, {
+    rawArgs: [
+      "dispatch",
+      "alpha",
+      "--title",
+      "Wiki context",
+      "--description",
+      "Traverse linked pages.",
+      "--context-depth",
+      "1",
+    ],
+  });
+
+  expect(process.exitCode ?? 0).toBe(0);
+
+  const logDir = join(vaultPath, "log");
+  const logFiles = (await readdir(logDir)).filter((name) =>
+    name.endsWith(".md")
+  );
+  const logContent = await Bun.file(join(logDir, logFiles[0]!)).text();
+  expect(logContent).toContain("Wiki context");
+  expect(logContent).toContain("**Tricorder:** passed");
+});
+
+test("bridge dispatch aborts on broken wiki-link before Away Team execution", async () => {
+  await setupDispatchFixtures();
+  await writeFile(
+    join(vaultPath, "archive", "alpha", "index.md"),
+    "# Alpha index\n\nSee [[Missing Page]].\n"
+  );
+
+  await runCommand(bridgeCommand, {
+    rawArgs: [
+      "dispatch",
+      "alpha",
+      "--title",
+      "Broken link",
+      "--description",
+      "Should fail before Away Team.",
+      "--context-depth",
+      "1",
+    ],
+  });
+
+  const output = stdout.join("\n");
+  expect(output).toContain("broken wiki-link to [[Missing Page]]");
+  expect(output).not.toContain("mock-claude: executed");
+});
+
 test("bridge dispatch errors when claude is not on PATH", async () => {
   await setupDispatchFixtures();
   process.env.SCOTTY_CLAUDE_PATH = "/nonexistent/claude";

@@ -1,6 +1,6 @@
 # Bridge
 
-The Bridge is Scotty's Phase 1 CLI: it orchestrates dispatch and diagnostic cycles against a git-backed **Scotty Vault** (Obsidian notes, Mission Orders, Engineering Log).
+The Bridge is Scotty's CLI: it orchestrates dispatch and diagnostic cycles against a git-backed **Scotty Vault** (Obsidian notes, Mission Orders, Engineering Log). Phase 2 adds Engineering Log and Fleet Status viewers, CursorTeam as a second Away Team, wiki-link context traversal, and issue-sourced dispatch.
 
 ## Operator setup
 
@@ -21,12 +21,20 @@ The Bridge is Scotty's Phase 1 CLI: it orchestrates dispatch and diagnostic cycl
 
 4. **Set environment variables** (optional overrides):
 
-   | Variable | Purpose |
-   |----------|---------|
-   | `SCOTTY_VAULT_PATH` | Vault directory (overrides `local.toml`) |
-   | `SCOTTY_VAULT_REMOTE` | Vault git remote (overrides `mission-orders.toml`) |
-   | `DISCORD_WEBHOOK_URL` | Discord webhook for failure hails |
-   | `SCOTTY_CLAUDE_PATH` | Path to `claude` binary (default: `claude` on `PATH`) |
+   | Variable                   | Purpose                                                    |
+   | -------------------------- | ---------------------------------------------------------- |
+   | `SCOTTY_VAULT_PATH`        | Vault directory (overrides `local.toml`)                   |
+   | `SCOTTY_VAULT_REMOTE`      | Vault git remote (overrides `mission-orders.toml`)         |
+   | `DISCORD_WEBHOOK_URL`      | Discord webhook for failure hails                          |
+   | `SCOTTY_CLAUDE_PATH`       | Path to `claude` binary (default: `claude` on `PATH`)      |
+   | `CURSOR_API_KEY`           | Required when Mission Orders sets `agent = "cursor"`       |
+   | `SCOTTY_CURSOR_MODEL`      | Cursor model id (default: `composer-2.5`)                  |
+   | `SCOTTY_CURSOR_STREAM_LOG` | When `1`, stream Cursor SDK output to console (default on) |
+   | `SCOTTY_CURSOR_RUNTIME`    | Cursor runtime selector (default: `node`)                  |
+   | `SCOTTY_NODE_BIN`          | Optional Node binary when runtime is `node`                |
+   | `SCOTTY_CURSOR_CWD`        | Optional cwd override; target repo path wins when unset    |
+
+   Canonical env names live in the repo root `.env-template` (Brain section). Out of scope for Bridge dispatch: `SCOTTY_CURSOR_PROMPT`, `SCOTTY_CURSOR_RESUME_PROMPT`, `SCOTTY_BRAIN`, `SCOTTY_BRAIN_SKILL_MAP`.
 
 5. **First dispatch:**
 
@@ -35,7 +43,7 @@ The Bridge is Scotty's Phase 1 CLI: it orchestrates dispatch and diagnostic cycl
    bridge dispatch alpha --title "Fix the widget" --description "Repair the broken widget."
    ```
 
-   Bridge pulls the vault, injects Archive context, runs Claude Code, runs the Tricorder when configured, and appends an Engineering Log entry (local commit only — no push).
+   Bridge pulls the vault, injects Archive context (with optional wiki-link traversal), runs the configured Away Team (`claude-code` or `cursor`), runs the Tricorder when configured, and appends an Engineering Log entry (local commit only — no push).
 
 ## Build the binary
 
@@ -71,7 +79,7 @@ Or:
 npm run test
 ```
 
-Integration tests use temp vaults and repos with mocked external services — no real Claude or Discord calls.
+Integration tests use temp vaults and repos with mocked external services — no real Claude, Cursor API, or Discord calls.
 
 ### Mock `claude` for local dev and CI
 
@@ -109,14 +117,31 @@ exit 0
 
 **Discord** is mocked by replacing `globalThis.fetch` in tests; set `DISCORD_WEBHOOK_URL` to any URL so the channel resolves.
 
+**Cursor SDK** is mocked by injecting `createAgent` into `createCursorTeam` (see `packages/bridge/src/away-team/cursor-team.test.ts` and `packages/bridge/src/dispatch/run-dispatch.test.ts`). Set `CURSOR_API_KEY` in tests but replace the SDK boundary — no real API calls in CI.
+
 See `packages/bridge/src/cli.integration.test.ts` for full fixtures (`installMockClaude`, `installMockDiagnosticClaude`, `installMockDiscordWebhook`).
 
 ## Commands
 
-| Command | Purpose |
-|---------|---------|
-| `bridge init` | Clone or scaffold the Scotty Vault |
-| `bridge roster` | Print the Duty Roster from Mission Orders |
-| `bridge dispatch <repo>` | Run the dispatch lifecycle |
-| `bridge diagnostic <repo>` | Update Archive from repo diff |
-| `bridge hail` | Send a test Discord hail |
+| Command                    | Purpose                                                            |
+| -------------------------- | ------------------------------------------------------------------ |
+| `bridge init`              | Clone or scaffold the Scotty Vault                                 |
+| `bridge roster`            | Print the Duty Roster from Mission Orders                          |
+| `bridge dispatch <repo>`   | Run the dispatch lifecycle                                         |
+| `bridge diagnostic <repo>` | Update Archive from repo diff                                      |
+| `bridge hail`              | Send a test Discord hail                                           |
+| `bridge log`               | Print Engineering Log entries (`--repo`, `--since`, `--limit`)     |
+| `bridge status`            | Print fleet health — last dispatch, sources SHA, stardate per repo |
+
+### Dispatch options (Phase 2)
+
+| Flag                        | Purpose                                                                                                                     |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `--title` / `--description` | Inline Task title and body                                                                                                  |
+| `--file`                    | Task from markdown file (`#` heading = title)                                                                               |
+| `--issue`                   | Task from issue markdown (H1 title + `## What to build` body; mutually exclusive with `--title`, `--description`, `--file`) |
+| `--priority`                | Task priority (default `0`)                                                                                                 |
+| `--context-depth`           | Wiki-link traversal depth for Archive context (overrides Mission Orders `contextDepth`)                                     |
+| `--skip-verify`             | Bypass Tricorder verification                                                                                               |
+
+Mission Orders selects the Away Team per repo: `agent = "claude-code"` (Claude Team) or `agent = "cursor"` (CursorTeam via `@cursor/sdk`).

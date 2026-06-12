@@ -52,7 +52,7 @@ The CLI package at `packages/bridge/` within the Scotty monorepo. Routes work to
 _Avoid_: Scotty (when referring specifically to the CLI), router (generic)
 
 **Dispatch**:
-A deliberate, human-triggered act that sends a Task to an Away Team for a named repository. Phase 1 entry point: `bridge dispatch <repo> --title "..." --description "..."` (or `--file`).
+A deliberate, human-triggered act that sends a Task to an Away Team for a named repository. Entry points: `bridge dispatch <repo> --title "..." --description "..."`, `--file`, or `--issue` (markdown issue with `## What to build`).
 _Avoid_: Auto-dispatch, diagnostic-driven code changes
 
 **Task**:
@@ -60,12 +60,16 @@ A unit of work handed to an Away Team: title, description, priority, and injecte
 _Avoid_: Job, ticket, issue
 
 **Away Team**:
-An agent backend that executes a dispatched Task against a target repository. May commit changes in the target repo; Bridge does not commit on its behalf. Phase 1: Claude Code only (`claude-code` via `claude -p`). CursorTeam comes later.
+An agent backend that executes a dispatched Task against a target repository. May commit changes in the target repo; Bridge does not commit on its behalf. Phase 1: Claude Code (`claude-code`). Phase 2: CursorTeam (`cursor` via `@cursor/sdk` local runtime).
 _Avoid_: Agent, worker, executor
 
 **Claude Team**:
 The Phase 1 Away Team implementation. Invokes Claude Code headlessly via `claude -p` and `Bun.$`. Selected when a repo profile sets `agent = "claude-code"`. Bridge fails fast if `claude` is not on PATH.
-_Avoid_: ClaudeTeam (code name), Cursor (for Phase 1)
+_Avoid_: ClaudeTeam (code name)
+
+**CursorTeam**:
+The Phase 2 Away Team implementation. Invokes the Cursor SDK (`@cursor/sdk`) with local runtime against the target repo. Selected when a repo profile sets `agent = "cursor"`. Requires `CURSOR_API_KEY`; model, streaming, runtime, and node bin from `SCOTTY_CURSOR_*` env vars per `.env-template`.
+_Avoid_: Cursor (generic), Brain (for dispatch routing)
 
 **Tricorder**:
 The verification engine that independently judges whether work succeeded. Decoupled from Away Team execution. Runs only when the repo profile declares a verifier (`bun` or `markdown`). Away Team self-reported success is ignored — Tricorder is the final word. On failure: log to Scotty Log, alert via Hailing Frequencies, exit non-zero; repo worktree left as-is for inspection. `--skip-verify` bypasses verification for bootstrap scenarios. Phase 1 verifiers: `BunVerifier` (`bun test`) and `MarkdownVerifier` (lint + link check).
@@ -116,7 +120,7 @@ Code references in Archive body text use `repo@sha path:line` format (e.g. `star
 _Avoid_: Bare file paths, line numbers without SHA
 
 **Context injection**:
-Archive pages passed to an Away Team as `Task.contextFiles` on dispatch. Defaults: `archive/<repo>/index.md` and `archive/<repo>/captains-log.md`. Optional extras declared per repo in Mission Orders (`context = ["architecture", ...]`). No wiki-link traversal in Phase 1.
+Archive pages passed to an Away Team as `Task.contextFiles` on dispatch. Defaults: `archive/<repo>/index.md` and `archive/<repo>/captains-log.md`. Optional extras declared per repo in Mission Orders (`context = ["architecture", ...]`). Phase 2: BFS wiki-link traversal to `contextDepth` (default `0`; per-repo in Mission Orders or `--context-depth` CLI override). Broken links abort before Away Team execution.
 _Avoid_: Full vault dump, unbounded link crawling
 
 **Markdown verification**:
@@ -136,3 +140,17 @@ _Avoid_: Repo list, registry
 Commands: `bridge init`, `bridge roster`, `bridge dispatch`, `bridge diagnostic`, `bridge hail`.
 
 Deferred to later: `bridge status`, `bridge log`, Bun.cron automation, CursorTeam, Ralph Loop.
+
+## Phase 2 MVP
+
+Commands: all Phase 1 commands plus `bridge log`, `bridge status`.
+
+Phase 2 dispatch enhancements:
+
+- **CursorTeam** — second Away Team via `agent = "cursor"` and `CURSOR_API_KEY`
+- **Wiki-link context** — `contextDepth` in Mission Orders or `--context-depth` on CLI
+- **Issue-sourced dispatch** — `--issue <path>` reads H1 title and `## What to build` body
+
+`bridge log` reads the Engineering Log (filters: `--repo`, `--since`, `--limit`). `bridge status` prints last dispatch outcome, diagnostic SHA, and Archive stardate per Duty Roster repo. Both pull the vault before reading.
+
+Deferred to later: Bun.cron automation, Ralph Loop, Discord bot / Brain interactive routing.

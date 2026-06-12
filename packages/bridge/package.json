@@ -3,8 +3,15 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "bridge": "./dist/bridge"
+  },
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "bun build --compile --minify --target=bun src/index.ts --outfile dist/bridge"
+  },
+  "dependencies": {
+    "citty": "^0.2.2"
   }
 }

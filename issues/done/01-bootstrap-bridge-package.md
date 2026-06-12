@@ -1,6 +1,6 @@
 # Bootstrap Bridge package with test and typecheck harness
 
-**Status:** ready-for-agent
+**Status:** done
 **Type:** AFK
 
 ## What to build

@@ -5,7 +5,8 @@
   "private": true,
   "workspaces": ["packages/*"],
   "scripts": {
-    "test": "bun test packages/bridge/src",
+    "test": "bun test packages/bridge",
+    "build:bridge": "bun run --filter @scotty/bridge build",
     "typecheck": "bunx tsc --noEmit -p packages/bridge",
     "prototype:discord-hail": "bun packages/bridge/prototype/discord-hail/run.ts"
   },

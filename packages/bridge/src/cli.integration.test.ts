@@ -213,6 +213,44 @@ test("bridge dispatch runs Claude Team with context and logs outcome", async () 
   expect(vaultLog.stdout.toString()).toContain("dispatch: alpha");
 });
 
+test("bridge dispatch local-commits vault without pushing to remote", async () => {
+  await setupDispatchFixtures();
+  await Bun.$`git add -A`.cwd(vaultPath).quiet();
+  await Bun.$`git commit -m ${"seed vault"}`.cwd(vaultPath).quiet();
+  await Bun.$`git branch -M main`.cwd(vaultPath).quiet();
+  const bareRemote = join(tempRoot, "vault-remote.git");
+  await Bun.$`git init --bare -b main ${bareRemote}`.quiet();
+  await Bun.$`git remote add origin ${bareRemote}`.cwd(vaultPath).quiet();
+  await Bun.$`git push -u origin main`.cwd(vaultPath).quiet();
+  const remoteBefore = (
+    await Bun.$`git rev-parse HEAD`.cwd(bareRemote).quiet()
+  ).stdout
+    .toString()
+    .trim();
+
+  await runCommand(bridgeCommand, {
+    rawArgs: [
+      "dispatch",
+      "alpha",
+      "--title",
+      "Local only",
+      "--description",
+      "Should not push.",
+    ],
+  });
+
+  expect(process.exitCode).toBe(0);
+  const remoteAfter = (
+    await Bun.$`git rev-parse HEAD`.cwd(bareRemote).quiet()
+  ).stdout
+    .toString()
+    .trim();
+  expect(remoteAfter).toBe(remoteBefore);
+
+  const localLog = await Bun.$`git log --oneline`.cwd(vaultPath).quiet();
+  expect(localLog.stdout.toString()).toContain("dispatch: alpha");
+});
+
 test("bridge dispatch loads Task from --file", async () => {
   await setupDispatchFixtures();
   const taskFile = join(tempRoot, "task.md");

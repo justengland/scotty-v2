@@ -6,12 +6,14 @@ import { hailCommand } from "./cli/commands/hail";
 import { initCommand } from "./cli/commands/init";
 import { logCommand } from "./cli/commands/log";
 import { rosterCommand } from "./cli/commands/roster";
+import { statusCommand } from "./cli/commands/status";
 import { bridgeCommand } from "./cli/main";
 
 const PHASE1_COMMANDS = [
   "init",
   "roster",
   "log",
+  "status",
   "dispatch",
   "diagnostic",
   "hail",
@@ -21,6 +23,7 @@ const COMMAND_HELP_CASES = [
   { name: "init", command: initCommand, term: "Scotty Vault" },
   { name: "roster", command: rosterCommand, term: "Duty Roster" },
   { name: "log", command: logCommand, term: "Engineering Log" },
+  { name: "status", command: statusCommand, term: "fleet health" },
   { name: "dispatch", command: dispatchCommand, term: "Away Team" },
   { name: "diagnostic", command: diagnosticCommand, term: "Diagnostic Cycle" },
   { name: "hail", command: hailCommand, term: "Hailing Frequencies" },

@@ -939,3 +939,95 @@ test("bridge log pulls vault before reading entries", async () => {
   const output = stdout.join("\n");
   expect(output).toContain("Remote-only entry");
 });
+
+async function writeFleetStatusFixtures(): Promise<void> {
+  await writeEngineeringLogFixtures();
+
+  const alphaArchive = join(vaultPath, "archive", "alpha");
+  await mkdir(alphaArchive, { recursive: true });
+  await writeFile(
+    join(alphaArchive, "index.md"),
+    `---
+entity: alpha-service
+repo: alpha
+updated: 2026-06-11
+sources: ["alpha@deadbeef1234"]
+---
+# Alpha index
+`
+  );
+
+  await Bun.$`git add -A`.cwd(vaultPath).quiet();
+  await Bun.$`git commit -m ${"add archive fixtures"}`.cwd(vaultPath).quiet();
+}
+
+test("bridge status lists every repo with dispatch, sources, and stardate", async () => {
+  await writeFleetStatusFixtures();
+
+  await runCommand(bridgeCommand, { rawArgs: ["status"] });
+
+  const output = stdout.join("\n");
+  expect(output).toContain("Fleet Status");
+  expect(output).toContain("alpha");
+  expect(output).toContain("success (2026-06-12)");
+  expect(output).toContain("deadbeef1234");
+  expect(output).toContain("2026-06-11");
+  expect(output).toContain("beta");
+  expect(output).toContain("failure (2026-06-12)");
+  expect(output).toContain("(none)");
+  expect(process.exitCode ?? 0).toBe(0);
+});
+
+test("bridge status pulls vault before reading fleet data", async () => {
+  await writeFleetStatusFixtures();
+  await Bun.$`git branch -M main`.cwd(vaultPath).quiet();
+  const bareRemote = join(tempRoot, "status-vault-remote.git");
+  await Bun.$`git init --bare -b main ${bareRemote}`.quiet();
+  await Bun.$`git remote add origin ${bareRemote}`.cwd(vaultPath).quiet();
+  await Bun.$`git push -u origin main`.cwd(vaultPath).quiet();
+
+  const clonePath = join(tempRoot, "status-vault-clone");
+  await Bun.$`git clone ${bareRemote} ${clonePath}`.quiet();
+  process.env.SCOTTY_VAULT_PATH = clonePath;
+
+  const remoteVault = join(tempRoot, "status-remote-vault");
+  await Bun.$`git clone ${bareRemote} ${remoteVault}`.quiet();
+  await writeFile(
+    join(remoteVault, "log", "2026-06-13.md"),
+    `## dispatch: beta — task-remote
+
+- **Repo:** beta
+- **Task:** Remote beta success
+- **Priority:** 1
+- **Outcome:** success
+- **Duration:** 100ms
+- **Summary:** Pulled from remote.
+`
+  );
+  await mkdir(join(remoteVault, "archive", "beta"), { recursive: true });
+  await writeFile(
+    join(remoteVault, "archive", "beta", "index.md"),
+    `---
+entity: beta-service
+repo: beta
+updated: 2026-06-13
+sources: ["beta@cafebabe5678"]
+---
+# Beta index
+`
+  );
+  await Bun.$`git config user.email test@example.com`.cwd(remoteVault).quiet();
+  await Bun.$`git config user.name Test`.cwd(remoteVault).quiet();
+  await Bun.$`git add -A`.cwd(remoteVault).quiet();
+  await Bun.$`git commit -m ${"add remote status data"}`
+    .cwd(remoteVault)
+    .quiet();
+  await Bun.$`git push origin main`.cwd(remoteVault).quiet();
+
+  await runCommand(bridgeCommand, { rawArgs: ["status"] });
+
+  const output = stdout.join("\n");
+  expect(output).toContain("success (2026-06-13)");
+  expect(output).toContain("cafebabe5678");
+  expect(output).toContain("2026-06-13");
+});

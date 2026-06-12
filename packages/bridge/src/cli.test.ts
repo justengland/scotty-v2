@@ -41,7 +41,7 @@ for (const { name, command, term } of COMMAND_HELP_CASES) {
   });
 }
 
-for (const name of PHASE1_COMMANDS) {
+for (const name of ["dispatch", "diagnostic", "hail"] as const) {
   test(`stub ${name} command completes without error`, async () => {
     await runCommand(bridgeCommand, { rawArgs: [name] });
   });
